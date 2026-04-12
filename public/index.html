@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מערכת ניהול ימות המשיח</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Heebo', Arial, sans-serif; }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .fade-in { animation: fadeIn .25s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+    th.sortable:hover { background:#e5e7eb; cursor:pointer; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+<!-- ═══ HEADER ═══════════════════════════════════════════════════════ -->
+<header class="bg-blue-900 text-white shadow-lg">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold">📞 מערכת ניהול – ימות המשיח</h1>
+      <p class="text-blue-300 text-xs mt-0.5" id="nav-sub">לחץ "טען נתונים" להתחיל</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="doRefresh()"
+        class="bg-blue-700 hover:bg-blue-600 text-white text-sm px-3 py-2 rounded-lg flex items-center gap-1 transition">
+        🔄 רענן
+      </button>
+      <button onclick="openSettings()"
+        class="bg-white text-blue-900 hover:bg-blue-50 text-sm font-semibold px-3 py-2 rounded-lg flex items-center gap-1 transition">
+        ⚙️ הגדרות
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ MAIN ══════════════════════════════════════════════════════════ -->
+<main class="max-w-7xl mx-auto px-4 py-6 space-y-4">
+
+  <!-- Alert -->
+  <div id="alert" class="hidden fade-in"></div>
+
+  <!-- Stats Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-blue-500">
+      <p class="text-gray-500 text-xs mb-1">סה"כ רשומות</p>
+      <p class="text-3xl font-bold text-blue-600" id="s-total">—</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-green-500">
+      <p class="text-gray-500 text-xs mb-1">היום</p>
+      <p class="text-3xl font-bold text-green-600" id="s-today">—</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-yellow-500">
+      <p class="text-gray-500 text-xs mb-1">השבוע</p>
+      <p class="text-3xl font-bold text-yellow-600" id="s-week">—</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-purple-500">
+      <p class="text-gray-500 text-xs mb-1">החודש</p>
+      <p class="text-3xl font-bold text-purple-600" id="s-month">—</p>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap items-center gap-3">
+    <input id="search" type="text" placeholder="🔍 חיפוש בכל השדות..."
+      oninput="onSearch(this.value)"
+      class="flex-1 min-w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+    <select id="page-size" onchange="onPageSize(this.value)"
+      class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <option value="25">25 שורות</option>
+      <option value="50">50 שורות</option>
+      <option value="100">100 שורות</option>
+      <option value="0">הכל</option>
+    </select>
+    <button onclick="doExport()"
+      class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg flex items-center gap-1 transition">
+      ⬇️ ייצוא CSV
+    </button>
+    <span id="rec-count" class="text-xs text-gray-500"></span>
+  </div>
+
+  <!-- Table card -->
+  <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+
+    <!-- Loading -->
+    <div id="state-loading" class="hidden py-20 text-center">
+      <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full spin mb-3"></div>
+      <p class="text-gray-400 text-sm">טוען נתונים מימות המשיח...</p>
+    </div>
+
+    <!-- Empty -->
+    <div id="state-empty" class="py-20 text-center">
+      <p class="text-5xl mb-3">📋</p>
+      <p class="text-gray-500 font-medium">אין נתונים להצגה</p>
+      <p class="text-gray-400 text-sm mt-1">הגדר פרטי חיבור ולחץ "טען נתונים"</p>
+      <button onclick="openSettings()"
+        class="mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2 rounded-lg transition">
+        פתח הגדרות
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div id="state-table" class="hidden overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead id="tbl-head"></thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- Pagination -->
+  <div id="pagination" class="hidden flex items-center justify-between flex-wrap gap-2">
+    <span id="page-info" class="text-sm text-gray-500"></span>
+    <div id="page-btns" class="flex gap-1"></div>
+  </div>
+
+</main>
+
+<!-- ═══ SETTINGS MODAL ════════════════════════════════════════════════ -->
+<div id="modal" class="hidden fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto fade-in">
+
+    <!-- Modal header -->
+    <div class="bg-blue-900 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+      <h2 class="font-bold text-lg">⚙️ הגדרות חיבור</h2>
+      <button onclick="closeSettings()" class="text-blue-200 hover:text-white text-2xl leading-none">✕</button>
+    </div>
+
+    <div class="p-6 space-y-5">
+
+      <!-- Auth type -->
+      <div>
+        <p class="text-sm font-semibold text-gray-700 mb-2">סוג אימות</p>
+        <div class="flex gap-5">
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="radio" name="auth" value="apikey" id="r-apikey" class="accent-blue-600" checked>
+            מפתח API
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="radio" name="auth" value="creds" id="r-creds" class="accent-blue-600">
+            שם משתמש + סיסמה
+          </label>
+        </div>
+      </div>
+
+      <!-- API Key -->
+      <div id="f-apikey">
+        <label class="block text-sm font-medium text-gray-700 mb-1">מפתח API</label>
+        <input id="m-apikey" type="text" placeholder="הכנס מפתח API"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+      </div>
+
+      <!-- Username + Password -->
+      <div id="f-creds" class="hidden grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">שם משתמש</label>
+          <input id="m-user" type="text" placeholder="שם משתמש"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
+          <input id="m-pass" type="password" placeholder="סיסמה"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        </div>
+      </div>
+
+      <!-- Path -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          נתיב הנתונים (שלוחה)
+          <button type="button" onclick="document.getElementById('path-tip').classList.toggle('hidden')"
+            class="text-blue-500 text-xs mr-1 font-normal">(?)</button>
+        </label>
+        <input id="m-path" type="text" placeholder="לדוגמה: /2/1/1"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <div id="path-tip" class="hidden mt-2 p-3 bg-blue-50 rounded-lg text-xs text-blue-700 space-y-1">
+          <p>הנתיב מתאים לנתיב השלוחה כפי שמוגדר במערכת ימות המשיח.</p>
+          <p>דוגמאות: <code>/2/1/1</code> &nbsp;|&nbsp; <code>0/5000</code> &nbsp;|&nbsp; <code>2/1/1</code></p>
+        </div>
+      </div>
+
+      <!-- API Base (advanced) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">
+          כתובת API
+          <span class="text-gray-400 font-normal text-xs">(ברירת מחדל: https://www.call2all.co.il/ym/api)</span>
+        </label>
+        <input id="m-base" type="text" placeholder="https://www.call2all.co.il/ym/api"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+      </div>
+
+      <!-- Column labels (shown only after data loads) -->
+      <div id="col-section" class="hidden">
+        <p class="text-sm font-semibold text-gray-700 mb-2">שמות עמודות לתצוגה</p>
+        <p class="text-xs text-gray-400 mb-3">השם המקורי מהקובץ מוצג משמאל. ניתן לשנות את שם התצוגה.</p>
+        <div id="col-inputs" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
+      </div>
+
+      <!-- Test -->
+      <div class="flex items-center gap-3 pt-1">
+        <button id="test-btn" onclick="doTest()"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded-lg transition">
+          🔗 בדוק חיבור
+        </button>
+        <span id="test-res" class="text-sm"></span>
+      </div>
+
+    </div>
+
+    <!-- Modal footer -->
+    <div class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t flex justify-between items-center">
+      <button onclick="closeSettings()" class="text-sm text-gray-500 hover:text-gray-700">ביטול</button>
+      <button onclick="doSaveLoad()"
+        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2 rounded-lg transition">
+        שמור וטען נתונים
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ SCRIPT ════════════════════════════════════════════════════════ -->
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+let cfg = loadCfg();
+let token = null;
+let allRows = [];       // raw rows from API
+let headers = [];       // column names
+let filtered = [];      // after search/sort
+let sortCol = '';
+let sortDir = 'asc';
+let page = 1;
+let perPage = 25;
+let search = '';
+
+// ── Config (localStorage) ──────────────────────────────────────────────
+function loadCfg() {
+  try { return JSON.parse(localStorage.getItem('ym_cfg') || '{}'); } catch { return {}; }
+}
+function saveCfg() { localStorage.setItem('ym_cfg', JSON.stringify(cfg)); }
+
+// ── API ────────────────────────────────────────────────────────────────
+async function getToken() {
+  if (cfg.authType === 'apikey') { token = cfg.apiKey; return; }
+  const r = await fetch('/api/login', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ username: cfg.username, password: cfg.password, apiBase: cfg.apiBase })
+  });
+  const d = await r.json();
+  if (d.responseStatus !== 'OK' || !d.token) throw new Error(d.message || 'שגיאת כניסה');
+  token = d.token;
+}
+
+async function fetchData() {
+  if (!cfg.tablePath) throw new Error('נתיב הנתונים לא הוגדר');
+  await getToken();
+  const r = await fetch('/api/get-data', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ token, tablePath: cfg.tablePath, apiBase: cfg.apiBase })
+  });
+  const d = await r.json();
+  if (!d.ok) throw new Error(d.message || 'שגיאה בטעינת נתונים');
+  return d;
+}
+
+// ── Parse ──────────────────────────────────────────────────────────────
+function parseResult(d) {
+  if (d.format === 'json') return parseJson(d.data);
+  return parseCsv(d.data || '');
+}
+
+function parseCsv(text) {
+  if (!text.trim()) return { headers: [], rows: [] };
+  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { headers: [], rows: [] };
+  const hdrs = csvLine(lines[0]);
+  const rows = lines.slice(1).map(l => {
+    const v = csvLine(l);
+    const row = {};
+    hdrs.forEach((h, i) => row[h] = v[i] ?? '');
+    return row;
+  }).filter(r => hdrs.some(h => r[h]?.trim()));
+  return { headers: hdrs, rows };
+}
+
+function csvLine(line) {
+  const out = []; let cur = ''; let q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (q && line[i+1]==='"') { cur+='"'; i++; } else q=!q; }
+    else if ((c===',' || c==='\t') && !q) { out.push(cur.trim()); cur=''; }
+    else cur += c;
+  }
+  out.push(cur.trim());
+  return out;
+}
+
+function parseJson(data) {
+  if (Array.isArray(data)) {
+    if (!data.length) return { headers: [], rows: [] };
+    return { headers: Object.keys(data[0]), rows: data };
+  }
+  if (typeof data.table === 'string') return parseCsv(data.table);
+  if (data.Tables?.[0]) {
+    const t = data.Tables[0];
+    const rows = t.Rows || [];
+    return { headers: t.Columns || Object.keys(rows[0] || {}), rows };
+  }
+  if (Array.isArray(data.data)) {
+    if (!data.data.length) return { headers: [], rows: [] };
+    return { headers: Object.keys(data.data[0]), rows: data.data };
+  }
+  return { headers: ['תוצאה'], rows: [{ 'תוצאה': JSON.stringify(data) }] };
+}
+
+// ── Stats ──────────────────────────────────────────────────────────────
+function calcStats() {
+  document.getElementById('s-total').textContent = allRows.length.toLocaleString();
+  const datecol = headers.find(h => /תאריך|date|יום|time/i.test(h));
+  if (!datecol) { ['s-today','s-week','s-month'].forEach(id => document.getElementById(id).textContent = '—'); return; }
+  const now = new Date();
+  const d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const w0 = new Date(d0); w0.setDate(d0.getDate() - d0.getDay());
+  const m0 = new Date(now.getFullYear(), now.getMonth(), 1);
+  let td=0, wk=0, mo=0;
+  allRows.forEach(r => {
+    const d = parseILDate(r[datecol]);
+    if (!d) return;
+    if (d >= d0) td++;
+    if (d >= w0) wk++;
+    if (d >= m0) mo++;
+  });
+  document.getElementById('s-today').textContent = td;
+  document.getElementById('s-week').textContent = wk;
+  document.getElementById('s-month').textContent = mo;
+}
+
+function parseILDate(s) {
+  if (!s) return null;
+  let m;
+  m = String(s).match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = String(s).match(/^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+
+// ── Render ─────────────────────────────────────────────────────────────
+function render() {
+  // filter
+  filtered = search
+    ? allRows.filter(r => headers.some(h => String(r[h]||'').toLowerCase().includes(search.toLowerCase())))
+    : [...allRows];
+
+  // sort
+  if (sortCol) {
+    filtered.sort((a, b) => {
+      const av = a[sortCol]||'', bv = b[sortCol]||'';
+      const an = parseFloat(av), bn = parseFloat(bv);
+      const cmp = !isNaN(an)&&!isNaN(bn) ? an-bn : av.localeCompare(bv,'he');
+      return sortDir==='asc' ? cmp : -cmp;
+    });
+  }
+
+  renderTable();
+  renderPagination();
+  document.getElementById('rec-count').textContent =
+    filtered.length !== allRows.length
+      ? `${filtered.length.toLocaleString()} מתוך ${allRows.length.toLocaleString()} רשומות`
+      : `${allRows.length.toLocaleString()} רשומות`;
+}
+
+function renderTable() {
+  const labels = cfg.columnLabels || {};
+
+  // Header
+  document.getElementById('tbl-head').innerHTML = '<tr class="border-b">' +
+    headers.map(h => {
+      const arrow = sortCol===h ? (sortDir==='asc'?' ▲':' ▼') : '';
+      return `<th onclick="doSort('${esc(h)}')"
+        class="sortable px-4 py-3 text-right font-semibold text-gray-600 bg-gray-50 whitespace-nowrap select-none">
+        ${esc(labels[h]||h)}${arrow}
+      </th>`;
+    }).join('') + '</tr>';
+
+  // Rows
+  const rows = perPage===0 ? filtered : filtered.slice((page-1)*perPage, page*perPage);
+  if (!rows.length) {
+    document.getElementById('tbl-body').innerHTML =
+      `<tr><td colspan="${headers.length}" class="text-center py-12 text-gray-400">לא נמצאו רשומות</td></tr>`;
+    return;
+  }
+  document.getElementById('tbl-body').innerHTML = rows.map((r, i) =>
+    `<tr class="${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors">` +
+    headers.map(h => `<td class="px-4 py-3 text-gray-700 border-b border-gray-100 whitespace-nowrap">${esc(r[h]||'')}</td>`).join('') +
+    '</tr>'
+  ).join('');
+}
+
+function renderPagination() {
+  const pag = document.getElementById('pagination');
+  if (!filtered.length || perPage===0) { pag.classList.add('hidden'); return; }
+  pag.classList.remove('hidden');
+  const totalPages = Math.ceil(filtered.length / perPage);
+  const s = (page-1)*perPage+1, e = Math.min(page*perPage, filtered.length);
+  document.getElementById('page-info').textContent = `מציג ${s}–${e} מתוך ${filtered.length.toLocaleString()}`;
+
+  const range = pageRange(page, totalPages);
+  document.getElementById('page-btns').innerHTML =
+    `<button onclick="goPage(${page-1})" ${page===1?'disabled':''} class="px-3 py-1.5 rounded border text-sm ${page===1?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">‹</button>` +
+    range.map(p => p==='…'
+      ? `<span class="px-2 text-gray-400">…</span>`
+      : `<button onclick="goPage(${p})" class="min-w-[36px] h-8 px-2 rounded border text-sm ${p===page?'bg-blue-600 text-white border-blue-600 font-medium':'hover:bg-gray-50'}">${p}</button>`
+    ).join('') +
+    `<button onclick="goPage(${page+1})" ${page===totalPages?'disabled':''} class="px-3 py-1.5 rounded border text-sm ${page===totalPages?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">›</button>`;
+}
+
+function pageRange(cur, tot) {
+  if (tot<=7) return Array.from({length:tot},(_,i)=>i+1);
+  const p=[1];
+  if (cur>3) p.push('…');
+  for(let i=Math.max(2,cur-1);i<=Math.min(tot-1,cur+1);i++) p.push(i);
+  if (cur<tot-2) p.push('…');
+  p.push(tot);
+  return p;
+}
+
+// ── Event handlers ─────────────────────────────────────────────────────
+function doSort(col) {
+  sortDir = sortCol===col && sortDir==='asc' ? 'desc' : 'asc';
+  sortCol = col;
+  page = 1;
+  render();
+}
+function onSearch(v) { search=v; page=1; render(); }
+function onPageSize(v) { perPage=parseInt(v)||0; page=1; render(); }
+function goPage(p) {
+  const tot = Math.ceil(filtered.length/perPage);
+  if (p<1||p>tot) return;
+  page=p; render();
+}
+
+function doExport() {
+  if (!filtered.length) { showAlert('warning','אין נתונים לייצוא'); return; }
+  const labels = cfg.columnLabels||{};
+  const hdr = headers.map(h=>`"${(labels[h]||h).replace(/"/g,'""')}"`).join(',');
+  const body = filtered.map(r =>
+    headers.map(h => { const v=String(r[h]||''); return /[,"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:`${v}`; }).join(',')
+  );
+  const csv = '\uFEFF'+[hdr,...body].join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download = `yemot_${(cfg.tablePath||'data').replace(/\//g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ── Main load ──────────────────────────────────────────────────────────
+async function doLoad() {
+  setState('loading');
+  clearAlert();
+  try {
+    const d = await fetchData();
+    const p = parseResult(d);
+    headers = p.headers;
+    allRows = p.rows;
+    calcStats();
+    search=''; page=1;
+    document.getElementById('search').value='';
+    setState('table');
+    render();
+    document.getElementById('nav-sub').textContent =
+      `נתיב: ${cfg.tablePath||''} · ${allRows.length.toLocaleString()} רשומות`;
+    showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
+  } catch(e) {
+    setState('empty');
+    showAlert('error', e.message);
+  }
+}
+
+async function doRefresh() { token=null; await doLoad(); }
+
+// ── Settings modal ─────────────────────────────────────────────────────
+function openSettings() {
+  const auth = cfg.authType||'apikey';
+  document.getElementById('r-'+auth).checked = true;
+  toggleAuth(auth);
+  document.getElementById('m-apikey').value = cfg.apiKey||'';
+  document.getElementById('m-user').value   = cfg.username||'';
+  document.getElementById('m-pass').value   = cfg.password||'';
+  document.getElementById('m-path').value   = cfg.tablePath||'';
+  document.getElementById('m-base').value   = cfg.apiBase||'';
+  if (headers.length) buildColInputs();
+  document.getElementById('col-section').classList.toggle('hidden', !headers.length);
+  document.getElementById('test-res').textContent='';
+  document.getElementById('modal').classList.remove('hidden');
+}
+function closeSettings() { document.getElementById('modal').classList.add('hidden'); }
+function toggleAuth(v) {
+  document.getElementById('f-apikey').classList.toggle('hidden', v!=='apikey');
+  document.getElementById('f-creds').classList.toggle('hidden', v!=='creds');
+}
+
+function buildColInputs() {
+  const labels = cfg.columnLabels||{};
+  document.getElementById('col-inputs').innerHTML = headers.map(h =>
+    `<div class="flex items-center gap-2">
+      <span class="text-xs text-gray-400 w-36 truncate font-mono" title="${esc(h)}">${esc(h)}</span>
+      <span class="text-gray-300">→</span>
+      <input type="text" class="col-lbl flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+        data-col="${esc(h)}" value="${esc(labels[h]||'')}" placeholder="${esc(h)}">
+    </div>`
+  ).join('');
+}
+
+function readSettings() {
+  const authType = document.querySelector('input[name="auth"]:checked').value;
+  const labels = {};
+  document.querySelectorAll('.col-lbl').forEach(inp => {
+    const c=inp.dataset.col, v=inp.value.trim();
+    if (v&&v!==c) labels[c]=v;
+  });
+  return {
+    authType,
+    apiKey:    document.getElementById('m-apikey').value.trim(),
+    username:  document.getElementById('m-user').value.trim(),
+    password:  document.getElementById('m-pass').value,
+    tablePath: document.getElementById('m-path').value.trim(),
+    apiBase:   document.getElementById('m-base').value.trim(),
+    columnLabels: labels
+  };
+}
+
+async function doTest() {
+  const btn=document.getElementById('test-btn');
+  const res=document.getElementById('test-res');
+  btn.disabled=true; res.textContent='בודק...'; res.className='text-sm text-gray-500';
+  const prev=cfg; cfg=readSettings(); token=null;
+  try {
+    await getToken();
+    res.textContent='✅ חיבור הצליח!'; res.className='text-sm text-green-600 font-semibold';
+  } catch(e) {
+    res.textContent='❌ '+e.message; res.className='text-sm text-red-600';
+    cfg=prev; token=null;
+  }
+  btn.disabled=false;
+}
+
+async function doSaveLoad() {
+  cfg = readSettings();
+  saveCfg();
+  token = null;
+  closeSettings();
+  await doLoad();
+}
+
+// ── UI helpers ─────────────────────────────────────────────────────────
+function setState(s) {
+  document.getElementById('state-loading').classList.toggle('hidden', s!=='loading');
+  document.getElementById('state-empty').classList.toggle('hidden',   s!=='empty');
+  document.getElementById('state-table').classList.toggle('hidden',   s!=='table');
+  if (s!=='table') document.getElementById('pagination').classList.add('hidden');
+}
+
+let alertTimer;
+function showAlert(type, msg) {
+  const el=document.getElementById('alert');
+  const bg={success:'bg-green-50 border-green-200 text-green-800',error:'bg-red-50 border-red-200 text-red-800',warning:'bg-amber-50 border-amber-200 text-amber-800'};
+  el.className=`flex items-center gap-3 px-4 py-3 rounded-xl border fade-in ${bg[type]}`;
+  el.innerHTML=`<span class="text-lg">${{success:'✅',error:'❌',warning:'⚠️'}[type]}</span><span class="flex-1 text-sm">${esc(msg)}</span><button onclick="this.parentElement.classList.add('hidden')" class="opacity-50 hover:opacity-100">✕</button>`;
+  el.classList.remove('hidden');
+  clearTimeout(alertTimer);
+  if (type==='success') alertTimer=setTimeout(()=>el.classList.add('hidden'),4000);
+}
+function clearAlert() { document.getElementById('alert').classList.add('hidden'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Init ───────────────────────────────────────────────────────────────
+document.querySelectorAll('input[name="auth"]').forEach(r=>r.addEventListener('change',e=>toggleAuth(e.target.value)));
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (cfg.tablePath || cfg.apiKey) doLoad();
+});
+</script>
+</body>
+</html>
