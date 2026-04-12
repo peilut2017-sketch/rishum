@@ -85,6 +85,11 @@
     </div>
   </div>
 
+  <!-- Pivot cards -->
+  <div id="pivot-section" class="hidden">
+    <div id="pivot-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </div>
+
   <!-- Controls -->
   <div class="bg-white rounded-xl shadow-sm p-3 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
     <input id="search" type="text" placeholder="🔍 חיפוש בכל השדות..."
@@ -253,6 +258,17 @@
           <p class="text-sm font-semibold text-gray-700 mb-1">שמות עמודות לתצוגה</p>
           <p class="text-xs text-gray-400 mb-3">ניתן לשנות את שם התצוגה לכל עמודה.</p>
           <div id="col-inputs" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- Pivot configuration (shown after data loaded) -->
+        <div id="pivot-cfg-section" class="hidden border-t pt-4 mt-2">
+          <div class="flex items-center justify-between mb-1">
+            <p class="text-sm font-semibold text-gray-700">📊 פילוחי נתונים</p>
+            <button type="button" onclick="addPivotRow()"
+              class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition">+ הוסף פילוח</button>
+          </div>
+          <p class="text-xs text-gray-400 mb-3">בחר עמודה — יוצג בראש העמוד כמה פעמים מופיע כל ערך.</p>
+          <div id="pivot-rows" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
         </div>
       </div>
 
@@ -466,6 +482,7 @@ async function doLoad() {
     document.getElementById('search').value='';
     setState('table');
     render();
+    calcPivots();
     _updateNavSub();
     showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
     startAutoRefresh();
@@ -522,6 +539,7 @@ function applyPendingData() {
   search = ''; page = 1;
   document.getElementById('search').value = '';
   render();
+  calcPivots();
   _updateNavSub();
   showAlert('success', `עודכן ל-${allRows.length.toLocaleString()} רשומות ✅`);
 }
@@ -625,8 +643,9 @@ function openSettings() {
   if (startStep === 3) _populateConfirmStep();
   goStep(startStep);
 
-  if (headers.length) buildColInputs();
+  if (headers.length) { buildColInputs(); buildPivotRows(); }
   document.getElementById('col-section').classList.toggle('hidden', !headers.length);
+  document.getElementById('pivot-cfg-section').classList.toggle('hidden', !headers.length);
   document.getElementById('modal').classList.remove('hidden');
 }
 
@@ -788,7 +807,8 @@ function readSettings() {
     apiKey:       wizToken,
     extension:    wizExt,
     fileName:     wizFile,
-    columnLabels: labels
+    columnLabels: labels,
+    pivots:       readPivots(),
   };
 }
 
@@ -817,6 +837,98 @@ function buildColInputs() {
         data-col="${esc(h)}" value="${esc(labels[h]||'')}" placeholder="${esc(h)}">
     </div>`
   ).join('');
+}
+
+// ── Pivot calculation & render ─────────────────────────────────────────
+const PIVOT_COLORS = ['#3b82f6','#22c55e','#a855f7','#f97316','#f43f5e','#14b8a6','#eab308','#6366f1'];
+
+function calcPivots() {
+  const pivots = (cfg.pivots || []).filter(p => p.col && headers.includes(p.col));
+  const sec    = document.getElementById('pivot-section');
+  const cards  = document.getElementById('pivot-cards');
+  if (!pivots.length || !allRows.length) { sec.classList.add('hidden'); return; }
+
+  cards.innerHTML = pivots.map((p, idx) => {
+    const color = PIVOT_COLORS[idx % PIVOT_COLORS.length];
+    const counts = {};
+    allRows.forEach(r => {
+      const v = String(r[p.col] ?? '').trim() || '(ריק)';
+      counts[v] = (counts[v] || 0) + 1;
+    });
+    const total  = allRows.length;
+    const items  = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const top    = items.slice(0, 8);
+    const rest   = items.length > 8 ? items.slice(8).reduce((s, e) => s + e[1], 0) : 0;
+    const label  = p.label || p.col;
+
+    const bars = top.map(([val, cnt]) => {
+      const pct = Math.round(cnt / total * 100);
+      return `<div>
+        <div class="flex justify-between items-center text-xs mb-0.5 gap-1">
+          <span class="text-gray-600 truncate" title="${esc(val)}">${esc(val)}</span>
+          <span class="font-semibold text-gray-700 flex-shrink-0">${cnt.toLocaleString()} <span class="text-gray-400 font-normal">(${pct}%)</span></span>
+        </div>
+        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div class="h-1.5 rounded-full" style="width:${pct}%;background-color:${color}"></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const restHtml = rest
+      ? `<p class="text-xs text-gray-400 mt-2">ועוד ${(items.length - 8)} ערכים נוספים (${rest.toLocaleString()} רשומות)</p>`
+      : '';
+
+    return `<div class="bg-white rounded-xl shadow-sm p-4">
+      <div class="flex items-center justify-between mb-3 gap-2">
+        <h3 class="font-semibold text-gray-700 text-sm truncate">${esc(label)}</h3>
+        <span class="text-xs text-gray-400 flex-shrink-0">${items.length} ערכים</span>
+      </div>
+      <div class="space-y-2">${bars}</div>
+      ${restHtml}
+    </div>`;
+  }).join('');
+
+  sec.classList.remove('hidden');
+}
+
+// ── Pivot settings (in modal step 3) ───────────────────────────────────
+function buildPivotRows() {
+  const container = document.getElementById('pivot-rows');
+  container.innerHTML = '';
+  const pivots = cfg.pivots || [];
+  if (pivots.length) {
+    pivots.forEach(p => _appendPivotRow(p.col, p.label || ''));
+  }
+}
+
+function addPivotRow() { _appendPivotRow('', ''); }
+
+function _appendPivotRow(col, label) {
+  const container = document.getElementById('pivot-rows');
+  const div = document.createElement('div');
+  div.className = 'flex items-center gap-2';
+  const opts = headers.map(h =>
+    `<option value="${esc(h)}"${h === col ? ' selected' : ''}>${esc(h)}</option>`
+  ).join('');
+  div.innerHTML = `
+    <select class="pivot-col flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300">
+      <option value="">בחר עמודה...</option>${opts}
+    </select>
+    <input type="text" class="pivot-lbl w-28 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+      placeholder="כותרת" value="${esc(label)}">
+    <button type="button" onclick="this.closest('div').remove()"
+      class="text-red-400 hover:text-red-600 text-xl leading-none flex-shrink-0 px-1">✕</button>`;
+  container.appendChild(div);
+}
+
+function readPivots() {
+  const pivots = [];
+  document.querySelectorAll('#pivot-rows > div').forEach(row => {
+    const col   = row.querySelector('.pivot-col')?.value  || '';
+    const label = row.querySelector('.pivot-lbl')?.value?.trim() || '';
+    if (col) pivots.push({ col, label });
+  });
+  return pivots;
 }
 
 // ── UI helpers ─────────────────────────────────────────────────────────
