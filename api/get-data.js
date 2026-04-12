@@ -4,94 +4,79 @@ const DL_URL  = 'https://www.call2all.co.il/ym/dl.php';
 const API_URL = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
-// Extract the "what" value from various input formats:
-//   Full URL:  https://www.call2all.co.il/ym/dl.php?what=ivr2:2/1/Foo.ini
-//   ivr2 path: ivr2:2/1/Foo.ini
-//   Plain path: /2/1/1  (legacy, try as ivr2:)
-function extractWhat(tablePath) {
-  const s = tablePath.trim();
-  // Full dl.php URL
+// Accept any of these input formats and return the "what" value:
+//   https://...dl.php?what=ivr2:2/1/Foo.ini  → ivr2:2/1/Foo.ini
+//   ivr2:2/1/Foo.ini                          → ivr2:2/1/Foo.ini
+//   /2/1/1  or  2/1/1                         → ivr2:2/1/1
+function toWhat(tablePath) {
+  const s = (tablePath || '').trim();
   if (s.includes('dl.php')) {
     try {
       const u = new URL(s.startsWith('http') ? s : 'https://www.call2all.co.il' + s);
       const w = u.searchParams.get('what');
-      if (w) return { what: w };
+      if (w) return w;
     } catch {}
   }
-  // Already has ivr2: prefix
-  if (s.startsWith('ivr2:')) return { what: s };
-  // Legacy plain path → wrap as ivr2:
+  if (s.startsWith('ivr2:')) return s;
   const plain = s.startsWith('/') ? s.slice(1) : s;
-  return { what: `ivr2:${plain}`, legacy: true };
+  return `ivr2:${plain}`;
 }
 
-// Parse text response into { format, data }
-// ימות המשיח .ini data files are CSV-like (first row = headers)
-function parseBody(text) {
-  if (!text || !text.trim()) return null;
-  const t = text.trim();
-
-  // JSON response
+async function tryFetch(url) {
   try {
-    const json = JSON.parse(t);
-    if (json.responseStatus === 'ERROR' || json.responseStatus === 'NOT_AUTHENTICATED') {
-      return { error: json.message || json.responseStatus };
-    }
-    if (typeof json.table === 'string') return { format: 'csv', data: json.table };
-    return { format: 'json', data: json };
-  } catch {}
-
-  // Detect error strings
-  if (/invalid|error|not.?found|forbidden/i.test(t) && !t.includes(',')) {
-    return { error: t.slice(0, 200) };
+    const r = await fetch(url);
+    const text = await r.text();
+    if (!text || !text.trim()) return null;
+    return text.trim();
+  } catch {
+    return null;
   }
+}
 
-  // Treat as CSV / INI data
-  return { format: 'csv', data: t };
+function parseText(text) {
+  if (!text) return null;
+  // JSON
+  try {
+    const j = JSON.parse(text);
+    if (j.responseStatus === 'ERROR' || j.responseStatus === 'NOT_AUTHENTICATED') return { error: j.message || j.responseStatus };
+    if (typeof j.table === 'string') return { format: 'csv', data: j.table };
+    return { format: 'json', data: j };
+  } catch {}
+  // Looks like an error string (no comma = not CSV)
+  if (!text.includes(',') && /invalid|error|not.?found|denied|forbidden/i.test(text)) {
+    return { error: text.slice(0, 300) };
+  }
+  // Treat as CSV/INI
+  return { format: 'csv', data: text };
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, tablePath, apiBase } = req.body;
-  const { what, legacy } = extractWhat(tablePath);
+  const what = toWhat(tablePath);
+  const base = (apiBase || API_URL).replace(/\/$/, '');
 
-  // Auth variants to try for dl.php
-  const authVariants = [
+  // Try in order: session-token auth, apiKey param, no-auth (in case public)
+  const urls = [
     `${DL_URL}?token=${enc(token)}&what=${enc(what)}`,
     `${DL_URL}?apiKey=${enc(token)}&what=${enc(what)}`,
     `${DL_URL}?key=${enc(token)}&what=${enc(what)}`,
-    `${DL_URL}?what=${enc(what)}&token=${enc(token)}`,
+    // Legacy API endpoints
+    `${base}/GetIvrTables?token=${enc(token)}&path=${enc(what)}`,
+    `${base}/GetTextFile?token=${enc(token)}&path=${enc(what)}`,
   ];
 
-  // If legacy path, also try old GetIvrTables
-  const legacyVariants = legacy ? [
-    `${(apiBase || API_URL).replace(/\/$/, '')}/GetIvrTables?token=${enc(token)}&path=${enc(tablePath)}`,
-    `${(apiBase || API_URL).replace(/\/$/, '')}/GetTextFile?token=${enc(token)}&path=${enc(tablePath)}`,
-  ] : [];
+  let lastError = 'לא התקבלה תגובה מהשרת';
 
-  const allUrls = [...authVariants, ...legacyVariants];
-
-  try {
-    for (const url of allUrls) {
-      let text;
-      try {
-        const r = await fetch(url);
-        text = await r.text();
-      } catch { continue; }
-
-      const parsed = parseBody(text);
-      if (!parsed) continue;
-      if (parsed.error) continue;   // this URL returned an error, try next
-      return res.json({ ok: true, format: parsed.format, data: parsed.data });
-    }
-
-    // All failed
-    res.json({
-      ok: false,
-      message: 'לא ניתן לטעון את הנתונים. ודא שהנתיב בפורמט: ivr2:2/1/ApprovalAll.ini'
-    });
-  } catch (e) {
-    res.status(502).json({ ok: false, message: e.message });
+  for (const url of urls) {
+    const text = await tryFetch(url);
+    if (!text) continue;
+    const parsed = parseText(text);
+    if (!parsed) continue;
+    if (parsed.error) { lastError = parsed.error; continue; }
+    return res.json({ ok: true, format: parsed.format, data: parsed.data });
   }
+
+  res.json({ ok: false, message: `שגיאת API: ${lastError}` });
 };

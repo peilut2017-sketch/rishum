@@ -268,14 +268,19 @@ function saveCfg() { localStorage.setItem('ym_cfg', JSON.stringify(cfg)); }
 
 // ── API ────────────────────────────────────────────────────────────────
 async function getToken() {
-  if (cfg.authType === 'apikey') { token = cfg.apiKey; return; }
+  const body = cfg.authType === 'apikey'
+    ? { apiKey: cfg.apiKey, apiBase: cfg.apiBase }
+    : { username: cfg.username, password: cfg.password, apiBase: cfg.apiBase };
+
   const r = await fetch('/api/login', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ username: cfg.username, password: cfg.password, apiBase: cfg.apiBase })
+    body: JSON.stringify(body)
   });
   const d = await r.json();
-  if (d.responseStatus !== 'OK' || !d.token) throw new Error(d.message || 'שגיאת כניסה');
+  if (d.responseStatus !== 'OK' || !d.token) {
+    throw new Error(d.message || 'שגיאת כניסה — בדוק מפתח API / שם משתמש וסיסמה');
+  }
   token = d.token;
 }
 
