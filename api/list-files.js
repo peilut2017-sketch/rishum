@@ -1,13 +1,13 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://www.call2all.co.il/ymot/api';
+const DL_BASE  = 'https://www.call2all.co.il/ym/dl.php';
 const enc = encodeURIComponent;
 
 const COMMON_FILES = ['ApprovalAll.ymgr', 'ApprovalAll.ini', 'All.ini', 'data.ini', 'Data.ini', 'FormData.ini', 'records.ini'];
 
 async function tryFile(token, ext, fileName) {
-  const path = `ivr2:${ext}/${fileName}`;
-  const url  = `${API_BASE}/GetTextFile?token=${enc(token)}&path=${enc(path)}`;
+  const what = `ivr2:${ext}/${fileName}`;
+  const url  = `${DL_BASE}?token=${enc(token)}&what=${enc(what)}`;
   try {
     const r = await Promise.race([
       fetch(url),
@@ -15,19 +15,9 @@ async function tryFile(token, ext, fileName) {
     ]);
     const text = await r.text();
     if (!text || !text.trim()) return null;
+    if (text.trimStart().startsWith('<')) return null; // HTML error page
 
-    // Try JSON envelope first, fall back to raw text as file content
-    let content = null;
-    try {
-      const json = JSON.parse(text);
-      if (json.responseStatus && json.responseStatus !== 'OK') return null;
-      content = json.file ?? json.content ?? json.data ?? json.text ?? null;
-    } catch {
-      content = text;
-    }
-    if (!content || !content.trim()) return null;
-
-    const lines = content.trim().split(/\r?\n/).filter(l => l.trim());
+    const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
     const sep = lines[0]?.includes('|') ? '|' : ',';
     const headers = (lines[0] || '').split(sep).map(h => h.replace(/"/g, '').trim()).filter(Boolean);
     const rowCount = Math.max(0, lines.length - 1);

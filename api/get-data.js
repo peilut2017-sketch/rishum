@@ -1,6 +1,6 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://www.call2all.co.il/ymot/api';
+const DL_BASE  = 'https://www.call2all.co.il/ym/dl.php';
 const enc = encodeURIComponent;
 
 // Parse INI/CSV content from ימות המשיח into { headers, rows }
@@ -36,8 +36,8 @@ module.exports = async (req, res) => {
 
   const file = fileName || 'ApprovalAll.ymgr';
   const ext  = String(extension).replace(/^\//, ''); // strip leading slash
-  const path = `ivr2:${ext}/${file}`;
-  const url  = `${API_BASE}/GetTextFile?token=${enc(token)}&path=${enc(path)}`;
+  const what = `ivr2:${ext}/${file}`;
+  const url  = `${DL_BASE}?token=${enc(token)}&what=${enc(what)}`;
 
   try {
     const r = await fetch(url);
@@ -47,22 +47,13 @@ module.exports = async (req, res) => {
       return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
     }
 
-    // Try to parse as JSON (ימות המשיח wraps content in JSON envelope)
-    let content = null;
-    try {
-      const json = JSON.parse(text);
-      if (json.responseStatus && json.responseStatus !== 'OK') {
-        return res.json({ ok: false, message: json.message || json.responseStatus || 'שגיאת API' });
-      }
-      content = json.file ?? json.content ?? json.data ?? json.text ?? null;
-    } catch {
-      // Not JSON — treat the raw response as the file content directly
-      content = text;
+    // dl.php returns the file content as plain text.
+    // If we got HTML back (error page), report it clearly.
+    if (text.trimStart().startsWith('<')) {
+      return res.json({ ok: false, message: `שגיאת שרת — הקובץ לא נמצא (בדוק token ומספר שלוחה)` });
     }
 
-    if (!content || !content.trim()) {
-      return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
-    }
+    const content = text;
 
     const parsed = parseIniContent(content);
     res.json({ ok: true, ...parsed, raw: content });
