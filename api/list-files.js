@@ -1,13 +1,17 @@
 const fetch = require('node-fetch');
 
-const DL_BASE  = 'https://www.call2all.co.il/ym/dl.php';
+const API_BASE = 'https://www.call2all.co.il/ymot/api';
 const enc = encodeURIComponent;
 
-const COMMON_FILES = ['ApprovalAll.ymgr', 'ApprovalAll.ini', 'All.ini', 'data.ini', 'Data.ini', 'FormData.ini', 'records.ini'];
+const COMMON_FILES = [
+  'approval_all.ymgr', 'ApprovalAll.ymgr',
+  'All.ymgr', 'data.ymgr',
+  'ApprovalAll.ini', 'All.ini', 'data.ini', 'FormData.ini'
+];
 
 async function tryFile(token, ext, fileName) {
-  const what = `ivr2:${ext}/${fileName}`;
-  const url  = `${DL_BASE}?token=${enc(token)}&what=${enc(what)}`;
+  const path = `ivr2:${ext}/${fileName}`;
+  const url  = `${API_BASE}/RenderYMGRFile?token=${enc(token)}&path=${enc(path)}`;
   try {
     const r = await Promise.race([
       fetch(url),
@@ -17,11 +21,22 @@ async function tryFile(token, ext, fileName) {
     if (!text || !text.trim()) return null;
     if (text.trimStart().startsWith('<')) return null; // HTML error page
 
+    // Count records (lines) and extract field names from first record
     const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
-    const sep = lines[0]?.includes('|') ? '|' : ',';
-    const headers = (lines[0] || '').split(sep).map(h => h.replace(/"/g, '').trim()).filter(Boolean);
-    const rowCount = Math.max(0, lines.length - 1);
-    return { path: `ivr2:${ext}/${fileName}`, fileName, headers, rowCount };
+    if (!lines.length) return null;
+
+    const headers = [];
+    const seen = new Set();
+    lines[0].split('*').forEach(pair => {
+      const idx = pair.indexOf('^');
+      if (idx === -1) return;
+      const key = pair.slice(0, idx).trim();
+      if (key && !seen.has(key)) { seen.add(key); headers.push(key); }
+    });
+
+    if (!headers.length) return null; // not a valid YMGR record
+
+    return { path, fileName, headers, rowCount: lines.length };
   } catch {
     return null;
   }
@@ -35,9 +50,8 @@ module.exports = async (req, res) => {
 
   const ext = String(extension).replace(/^\//, '');
 
-  const attempts = COMMON_FILES.map(f => tryFile(token, ext, f));
-  const results  = await Promise.all(attempts);
-  const found    = results.filter(Boolean);
+  const results = await Promise.all(COMMON_FILES.map(f => tryFile(token, ext, f)));
+  const found   = results.filter(Boolean);
 
   res.json({ ok: true, files: found });
 };

@@ -1,29 +1,37 @@
 const fetch = require('node-fetch');
 
-const DL_BASE  = 'https://www.call2all.co.il/ym/dl.php';
+const API_BASE = 'https://www.call2all.co.il/ymot/api';
 const enc = encodeURIComponent;
 
-// Parse INI/CSV content from ימות המשיח into { headers, rows }
-function parseIniContent(text) {
-  if (!text || !text.trim()) return { headers: [], rows: [] };
-  const raw = text.trim();
+// Parse YMGR raw text format:
+//   Each record is on its own line.
+//   Within a record, fields are separated by '*'.
+//   Within each field, key and value are separated by '^'.
+// e.g.: "שם^ישראל*טלפון^050-1234567"  → { שם: 'ישראל', טלפון: '050-1234567' }
+function parseYmgrContent(raw) {
+  if (!raw || !raw.trim()) return { headers: [], rows: [] };
 
-  // Detect separator: pipe | or comma ,
-  const firstLine = raw.split(/\r?\n/)[0];
-  const sep = firstLine.includes('|') ? '|' : ',';
-
-  const lines = raw.split(/\r?\n/).filter(l => l.trim() && !l.startsWith(';') && !l.startsWith('#'));
+  const lines = raw.trim().split(/\r?\n/).filter(l => l.trim());
   if (!lines.length) return { headers: [], rows: [] };
 
-  const headers = lines[0].split(sep).map(h => h.replace(/"/g, '').trim());
-  const rows = lines.slice(1).map(line => {
-    const vals = line.split(sep).map(v => v.replace(/"/g, '').trim());
-    const row = {};
-    headers.forEach((h, i) => { row[h] = vals[i] ?? ''; });
-    return row;
-  }).filter(r => headers.some(h => r[h]));
+  const headerOrder = [];
+  const headerSet   = new Set();
 
-  return { headers, rows };
+  const rows = lines.map(line => {
+    const record = {};
+    line.split('*').forEach(pair => {
+      const idx = pair.indexOf('^');
+      if (idx === -1) return;
+      const key = pair.slice(0, idx).trim();
+      const val = pair.slice(idx + 1).trim();
+      if (!key) return;
+      record[key] = val;
+      if (!headerSet.has(key)) { headerSet.add(key); headerOrder.push(key); }
+    });
+    return record;
+  }).filter(r => Object.keys(r).length > 0);
+
+  return { headers: headerOrder, rows };
 }
 
 module.exports = async (req, res) => {
@@ -34,29 +42,25 @@ module.exports = async (req, res) => {
   if (!token)     return res.json({ ok: false, message: 'נדרש מפתח API' });
   if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
-  const file = fileName || 'ApprovalAll.ymgr';
-  const ext  = String(extension).replace(/^\//, ''); // strip leading slash
-  const what = `ivr2:${ext}/${file}`;
-  const url  = `${DL_BASE}?token=${enc(token)}&what=${enc(what)}`;
+  const file = fileName || 'approval_all.ymgr';
+  const ext  = String(extension).replace(/^\//, '');
+  const path = `ivr2:${ext}/${file}`;
+  const url  = `${API_BASE}/RenderYMGRFile?token=${enc(token)}&path=${enc(path)}`;
 
   try {
-    const r = await fetch(url);
+    const r    = await fetch(url);
     const text = await r.text();
 
     if (!text || !text.trim()) {
       return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
     }
 
-    // dl.php returns the file content as plain text.
-    // If we got HTML back (error page), report it clearly.
     if (text.trimStart().startsWith('<')) {
       return res.json({ ok: false, message: `שגיאת שרת — הקובץ לא נמצא (בדוק token ומספר שלוחה)` });
     }
 
-    const content = text;
-
-    const parsed = parseIniContent(content);
-    res.json({ ok: true, ...parsed, raw: content });
+    const parsed = parseYmgrContent(text);
+    res.json({ ok: true, ...parsed, raw: text });
 
   } catch (e) {
     res.status(502).json({ ok: false, message: e.message });
