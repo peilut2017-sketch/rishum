@@ -50,7 +50,7 @@ module.exports = async (req, res) => {
   if (!token)     return res.json({ ok: false, message: 'נדרש מפתח API' });
   if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
-  const file = fileName || 'APPROVALALL.YMGR';
+  const file = fileName || 'approvalall.ymgr';
   const ext  = String(extension).replace(/^\//, '');
   const what = `ivr2:/${ext}/${file}`;
 

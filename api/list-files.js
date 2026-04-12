@@ -4,7 +4,7 @@ const API_BASE = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
 const COMMON_FILES = [
-  'APPROVALALL.YMGR', 'ApprovalAll.ymgr', 'approval_all.ymgr',
+  'approvalall.ymgr', 'ApprovalAll.ymgr', 'approval_all.ymgr',
   'ALL.YMGR', 'All.ymgr', 'DATA.YMGR', 'data.ymgr', 'FORMDATA.YMGR',
 ];
 
