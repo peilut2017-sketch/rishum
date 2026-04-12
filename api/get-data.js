@@ -1,13 +1,13 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://www.call2all.co.il/ymot/api';
+const API_BASE = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
-// Parse YMGR raw text format:
-//   Each record is on its own line.
-//   Within a record, fields are separated by '*'.
-//   Within each field, key and value are separated by '^'.
-// e.g.: "שם^ישראל*טלפון^050-1234567"  → { שם: 'ישראל', טלפון: '050-1234567' }
+// Parse YMGR raw content:
+//   Each line = one record
+//   Fields separated by '*'
+//   Key ^ Value within each field
+//   e.g. "שם^ישראל*טלפון^050-1234567"
 function parseYmgrContent(raw) {
   if (!raw || !raw.trim()) return { headers: [], rows: [] };
 
@@ -42,13 +42,13 @@ module.exports = async (req, res) => {
   if (!token)     return res.json({ ok: false, message: 'נדרש מפתח API' });
   if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
-  const file = fileName || 'approval_all.ymgr';
+  const file = fileName || 'APPROVALALL.YMGR';
   const ext  = String(extension).replace(/^\//, '');
   const path = `ivr2:${ext}/${file}`;
-  const url  = `${API_BASE}/RenderYMGRFile?token=${enc(token)}&path=${enc(path)}`;
+  const url  = `${API_BASE}/DownloadFile?path=${enc(path)}`;
 
   try {
-    const r    = await fetch(url);
+    const r    = await fetch(url, { headers: { authorization: token } });
     const text = await r.text();
 
     if (!text || !text.trim()) {
@@ -56,7 +56,7 @@ module.exports = async (req, res) => {
     }
 
     if (text.trimStart().startsWith('<')) {
-      return res.json({ ok: false, message: `שגיאת שרת — הקובץ לא נמצא (בדוק token ומספר שלוחה)` });
+      return res.json({ ok: false, message: `שגיאת שרת — בדוק token ומספר שלוחה (${r.status})` });
     }
 
     const parsed = parseYmgrContent(text);

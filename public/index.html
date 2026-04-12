@@ -406,7 +406,7 @@ async function doLoad() {
     document.getElementById('search').value='';
     setState('table');
     render();
-    const file = cfg.fileName || 'approval_all.ymgr';
+    const file = cfg.fileName || 'APPROVALALL.YMGR';
     document.getElementById('nav-sub').textContent =
       `ivr2:${cfg.extension}/${file} · ${allRows.length.toLocaleString()} רשומות`;
     showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);

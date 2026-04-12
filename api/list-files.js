@@ -1,27 +1,29 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://www.call2all.co.il/ymot/api';
+const API_BASE = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
+// Common filenames to probe (case variants included)
 const COMMON_FILES = [
-  'approval_all.ymgr', 'ApprovalAll.ymgr',
-  'All.ymgr', 'data.ymgr',
-  'ApprovalAll.ini', 'All.ini', 'data.ini', 'FormData.ini'
+  'APPROVALALL.YMGR', 'ApprovalAll.ymgr', 'approval_all.ymgr',
+  'ALL.YMGR', 'All.ymgr',
+  'DATA.YMGR', 'data.ymgr',
+  'FORMDATA.YMGR', 'FormData.ymgr',
 ];
 
 async function tryFile(token, ext, fileName) {
   const path = `ivr2:${ext}/${fileName}`;
-  const url  = `${API_BASE}/RenderYMGRFile?token=${enc(token)}&path=${enc(path)}`;
+  const url  = `${API_BASE}/DownloadFile?path=${enc(path)}`;
   try {
     const r = await Promise.race([
-      fetch(url),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      fetch(url, { headers: { authorization: token } }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000))
     ]);
     const text = await r.text();
-    if (!text || !text.trim()) return null;
-    if (text.trimStart().startsWith('<')) return null; // HTML error page
+    if (!text || !text.trim())              return null;
+    if (text.trimStart().startsWith('<'))   return null; // HTML error page
 
-    // Count records (lines) and extract field names from first record
+    // Parse to extract headers and row count
     const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
     if (!lines.length) return null;
 
