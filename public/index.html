@@ -134,85 +134,46 @@
 
     <div class="p-6 space-y-5">
 
-      <!-- Auth type -->
+      <!-- Token -->
       <div>
-        <p class="text-sm font-semibold text-gray-700 mb-2">סוג אימות</p>
-        <div class="flex gap-5">
-          <label class="flex items-center gap-2 cursor-pointer text-sm">
-            <input type="radio" name="auth" value="apikey" id="r-apikey" class="accent-blue-600" checked>
-            מפתח API
-          </label>
-          <label class="flex items-center gap-2 cursor-pointer text-sm">
-            <input type="radio" name="auth" value="creds" id="r-creds" class="accent-blue-600">
-            שם משתמש + סיסמה
-          </label>
-        </div>
-      </div>
-
-      <!-- API Key -->
-      <div id="f-apikey">
-        <label class="block text-sm font-medium text-gray-700 mb-1">מפתח API</label>
-        <input id="m-apikey" type="text" placeholder="הכנס מפתח API"
+        <label class="block text-sm font-semibold text-gray-700 mb-1">🔑 מפתח API (Token)</label>
+        <input id="m-apikey" type="text" placeholder="הכנס את מפתח ה-API של המערכת"
           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <p class="text-xs text-gray-400 mt-1">מפתח ייחודי לכל מערכת ימות המשיח</p>
       </div>
 
-      <!-- Username + Password -->
-      <div id="f-creds" class="hidden grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">שם משתמש</label>
-          <input id="m-user" type="text" placeholder="שם משתמש"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">סיסמה</label>
-          <input id="m-pass" type="password" placeholder="סיסמה"
-            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-        </div>
-      </div>
-
-      <!-- Path -->
+      <!-- Extension number -->
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">נתיב קובץ הנתונים</label>
-
-        <!-- Paste full URL shortcut -->
-        <div class="mb-2 p-3 bg-blue-50 rounded-lg">
-          <p class="text-xs font-semibold text-blue-700 mb-1">💡 הכי קל: הדבק את כתובת ה-URL מימות המשיח</p>
-          <div class="flex gap-2">
-            <input id="m-paste-url" type="text" placeholder="הדבק כתובת URL מלאה מימות המשיח..."
-              class="flex-1 border border-blue-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white">
-            <button onclick="pasteUrl()" type="button"
-              class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap transition">
-              ↵ מלא
-            </button>
-          </div>
-          <p class="text-xs text-blue-500 mt-1">לדוגמה: <code>https://...dl.php?what=ivr2:2/1/ApprovalAll.ini</code></p>
-        </div>
-
+        <label class="block text-sm font-semibold text-gray-700 mb-1">📞 מספר שלוחה</label>
         <div class="flex gap-2">
-          <input id="m-path" type="text" placeholder="ivr2:2/1/ApprovalAll.ini"
+          <input id="m-ext" type="text" placeholder="לדוגמה: 5  או  2/1"
+            oninput="updatePathPreview()"
             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
           <button id="search-files-btn" onclick="doSearchFiles()" type="button"
-            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-lg whitespace-nowrap transition flex items-center gap-1">
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-lg transition flex items-center gap-1">
             <span id="search-files-icon">🔍</span>
-            <span id="search-files-label">חפש</span>
+            <span id="search-files-label">חפש קבצים</span>
           </button>
         </div>
-        <p class="text-xs text-gray-400 mt-1">פורמט: <code>ivr2:תיקייה/שם_קובץ.ini</code></p>
+        <!-- Dynamic path preview -->
+        <p class="text-xs text-gray-400 mt-1">
+          נתיב שייווצר: <code id="path-preview" class="text-blue-600">ivr2:__/ApprovalAll.ini</code>
+        </p>
 
         <!-- Found files list -->
-        <div id="files-found" class="hidden mt-3 space-y-2">
-          <p class="text-xs font-semibold text-gray-500 mb-1">קבצים שנמצאו – לחץ לבחירה:</p>
-          <div id="files-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
+        <div id="files-found" class="hidden mt-3">
+          <p class="text-xs font-semibold text-gray-500 mb-2">קבצים שנמצאו – לחץ לבחירה:</p>
+          <div id="files-list" class="space-y-2 max-h-56 overflow-y-auto"></div>
         </div>
       </div>
 
-      <!-- API Base (advanced) -->
+      <!-- Advanced: custom filename -->
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">
-          כתובת API
-          <span class="text-gray-400 font-normal text-xs">(ברירת מחדל: https://www.call2all.co.il/ym/api)</span>
+          שם קובץ
+          <span class="text-gray-400 text-xs font-normal">(ברירת מחדל: ApprovalAll.ini)</span>
         </label>
-        <input id="m-base" type="text" placeholder="https://www.call2all.co.il/ym/api"
+        <input id="m-filename" type="text" placeholder="ApprovalAll.ini"
           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
       </div>
 
@@ -250,7 +211,6 @@
 <script>
 // ── State ──────────────────────────────────────────────────────────────
 let cfg = loadCfg();
-let token = null;
 let allRows = [];       // raw rows from API
 let headers = [];       // column names
 let filtered = [];      // after search/sort
@@ -267,87 +227,17 @@ function loadCfg() {
 function saveCfg() { localStorage.setItem('ym_cfg', JSON.stringify(cfg)); }
 
 // ── API ────────────────────────────────────────────────────────────────
-async function getToken() {
-  // API key is used directly as the token with dl.php — no Login needed
-  if (cfg.authType === 'apikey') {
-    if (!cfg.apiKey) throw new Error('מפתח API לא הוגדר');
-    token = cfg.apiKey;
-    return;
-  }
-  // Username + password → get session token via Login
-  const r = await fetch('/api/login', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ username: cfg.username, password: cfg.password, apiBase: cfg.apiBase })
-  });
-  const d = await r.json();
-  if (d.responseStatus !== 'OK' || !d.token) {
-    throw new Error(d.message || 'שגיאת כניסה — בדוק שם משתמש וסיסמה');
-  }
-  token = d.token;
-}
-
 async function fetchData() {
-  if (!cfg.tablePath) throw new Error('נתיב הנתונים לא הוגדר');
-  await getToken();
+  if (!cfg.apiKey)    throw new Error('מפתח API לא הוגדר');
+  if (!cfg.extension) throw new Error('מספר שלוחה לא הוגדר');
   const r = await fetch('/api/get-data', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ token, tablePath: cfg.tablePath, apiBase: cfg.apiBase })
+    body: JSON.stringify({ token: cfg.apiKey, extension: cfg.extension, fileName: cfg.fileName || '' })
   });
   const d = await r.json();
   if (!d.ok) throw new Error(d.message || 'שגיאה בטעינת נתונים');
   return d;
-}
-
-// ── Parse ──────────────────────────────────────────────────────────────
-function parseResult(d) {
-  if (d.format === 'json') return parseJson(d.data);
-  return parseCsv(d.data || '');
-}
-
-function parseCsv(text) {
-  if (!text.trim()) return { headers: [], rows: [] };
-  const lines = text.trim().split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return { headers: [], rows: [] };
-  const hdrs = csvLine(lines[0]);
-  const rows = lines.slice(1).map(l => {
-    const v = csvLine(l);
-    const row = {};
-    hdrs.forEach((h, i) => row[h] = v[i] ?? '');
-    return row;
-  }).filter(r => hdrs.some(h => r[h]?.trim()));
-  return { headers: hdrs, rows };
-}
-
-function csvLine(line) {
-  const out = []; let cur = ''; let q = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') { if (q && line[i+1]==='"') { cur+='"'; i++; } else q=!q; }
-    else if ((c===',' || c==='\t') && !q) { out.push(cur.trim()); cur=''; }
-    else cur += c;
-  }
-  out.push(cur.trim());
-  return out;
-}
-
-function parseJson(data) {
-  if (Array.isArray(data)) {
-    if (!data.length) return { headers: [], rows: [] };
-    return { headers: Object.keys(data[0]), rows: data };
-  }
-  if (typeof data.table === 'string') return parseCsv(data.table);
-  if (data.Tables?.[0]) {
-    const t = data.Tables[0];
-    const rows = t.Rows || [];
-    return { headers: t.Columns || Object.keys(rows[0] || {}), rows };
-  }
-  if (Array.isArray(data.data)) {
-    if (!data.data.length) return { headers: [], rows: [] };
-    return { headers: Object.keys(data.data[0]), rows: data.data };
-  }
-  return { headers: ['תוצאה'], rows: [{ 'תוצאה': JSON.stringify(data) }] };
 }
 
 // ── Stats ──────────────────────────────────────────────────────────────
@@ -487,7 +377,7 @@ function doExport() {
   const csv = '\uFEFF'+[hdr,...body].join('\r\n');
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download = `yemot_${(cfg.tablePath||'data').replace(/\//g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.download = `yemot_${(cfg.extension||'data').replace(/\//g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
 }
 
@@ -497,16 +387,16 @@ async function doLoad() {
   clearAlert();
   try {
     const d = await fetchData();
-    const p = parseResult(d);
-    headers = p.headers;
-    allRows = p.rows;
+    headers = d.headers;
+    allRows = d.rows;
     calcStats();
     search=''; page=1;
     document.getElementById('search').value='';
     setState('table');
     render();
+    const file = cfg.fileName || 'ApprovalAll.ini';
     document.getElementById('nav-sub').textContent =
-      `נתיב: ${cfg.tablePath||''} · ${allRows.length.toLocaleString()} רשומות`;
+      `ivr2:${cfg.extension}/${file} · ${allRows.length.toLocaleString()} רשומות`;
     showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
   } catch(e) {
     setState('empty');
@@ -514,7 +404,7 @@ async function doLoad() {
   }
 }
 
-async function doRefresh() { token=null; await doLoad(); }
+async function doRefresh() { await doLoad(); }
 
 // ── File browser ───────────────────────────────────────────────────────
 async function doSearchFiles() {
@@ -524,12 +414,11 @@ async function doSearchFiles() {
   const box   = document.getElementById('files-found');
   const list  = document.getElementById('files-list');
 
-  const basePath = document.getElementById('m-path').value.trim();
-  if (!basePath) { alert('הכנס נתיב שלוחה קודם'); return; }
+  const apiKey = document.getElementById('m-apikey').value.trim();
+  const ext    = document.getElementById('m-ext').value.trim();
 
-  // Get temp token from form
-  const tmpCfg = readSettings();
-  const prevCfg = cfg; cfg = tmpCfg; token = null;
+  if (!apiKey) { alert('הכנס מפתח API קודם'); return; }
+  if (!ext)    { alert('הכנס מספר שלוחה קודם'); return; }
 
   btn.disabled = true;
   icon.textContent = '⏳';
@@ -537,11 +426,10 @@ async function doSearchFiles() {
   box.classList.add('hidden');
 
   try {
-    await getToken();
     const r = await fetch('/api/list-files', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ token, basePath, apiBase: tmpCfg.apiBase })
+      body: JSON.stringify({ token: apiKey, extension: ext })
     });
     const d = await r.json();
 
@@ -551,10 +439,10 @@ async function doSearchFiles() {
       list.innerHTML = '<p class="text-sm text-gray-400 py-2">לא נמצאו קבצים בנתיב זה</p>';
     } else {
       list.innerHTML = d.files.map(f => `
-        <button type="button" onclick="selectFile('${esc(f.path)}')"
+        <button type="button" onclick="selectFile('${esc(f.fileName)}')"
           class="w-full text-right bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg px-4 py-3 transition group">
           <div class="flex items-center justify-between">
-            <span class="font-mono text-sm font-semibold text-blue-700">${esc(f.path)}</span>
+            <span class="font-mono text-sm font-semibold text-blue-700">${esc(f.fileName)}</span>
             <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full group-hover:bg-blue-200">
               ${f.rowCount} רשומות
             </span>
@@ -571,7 +459,6 @@ async function doSearchFiles() {
   } catch(e) {
     list.innerHTML = `<p class="text-sm text-red-500 py-2">❌ ${esc(e.message)}</p>`;
     box.classList.remove('hidden');
-    cfg = prevCfg; token = null;
   }
 
   btn.disabled = false;
@@ -579,56 +466,34 @@ async function doSearchFiles() {
   label.textContent = 'חפש קבצים';
 }
 
-// Parse a pasted dl.php URL and fill the path input
-function pasteUrl() {
-  const raw = document.getElementById('m-paste-url').value.trim();
-  if (!raw) return;
-  let what = '';
-  try {
-    const u = new URL(raw.startsWith('http') ? raw : 'https://www.call2all.co.il' + raw);
-    what = u.searchParams.get('what') || '';
-  } catch {
-    // Maybe they pasted just the "what" value
-    what = raw;
-  }
-  if (what) {
-    document.getElementById('m-path').value = what;
-    document.getElementById('m-paste-url').value = '';
-    showAlert('success', 'הנתיב עודכן: ' + what);
-  } else {
-    showAlert('warning', 'לא ניתן לחלץ את הנתיב מהכתובת');
-  }
-}
-
-function selectFile(path) {
-  document.getElementById('m-path').value = path;
-  // Highlight selection
+function selectFile(fileName) {
+  document.getElementById('m-filename').value = fileName;
+  updatePathPreview();
   document.querySelectorAll('#files-list button').forEach(b => {
-    b.classList.toggle('ring-2', b.getAttribute('onclick').includes(path));
-    b.classList.toggle('ring-blue-500', b.getAttribute('onclick').includes(path));
+    const sel = b.getAttribute('onclick').includes(`'${fileName}'`);
+    b.classList.toggle('ring-2', sel);
+    b.classList.toggle('ring-blue-500', sel);
   });
 }
 
 // ── Settings modal ─────────────────────────────────────────────────────
 function openSettings() {
-  const auth = cfg.authType||'apikey';
-  document.getElementById('r-'+auth).checked = true;
-  toggleAuth(auth);
-  document.getElementById('m-apikey').value = cfg.apiKey||'';
-  document.getElementById('m-user').value   = cfg.username||'';
-  document.getElementById('m-pass').value   = cfg.password||'';
-  document.getElementById('m-path').value   = cfg.tablePath||'';
-  document.getElementById('m-base').value   = cfg.apiBase||'';
+  document.getElementById('m-apikey').value   = cfg.apiKey    || '';
+  document.getElementById('m-ext').value      = cfg.extension || '';
+  document.getElementById('m-filename').value = cfg.fileName  || '';
+  updatePathPreview();
   if (headers.length) buildColInputs();
   document.getElementById('col-section').classList.toggle('hidden', !headers.length);
-  document.getElementById('test-res').textContent='';
+  document.getElementById('test-res').textContent = '';
   document.getElementById('files-found').classList.add('hidden');
   document.getElementById('modal').classList.remove('hidden');
 }
 function closeSettings() { document.getElementById('modal').classList.add('hidden'); }
-function toggleAuth(v) {
-  document.getElementById('f-apikey').classList.toggle('hidden', v!=='apikey');
-  document.getElementById('f-creds').classList.toggle('hidden', v!=='creds');
+
+function updatePathPreview() {
+  const ext  = document.getElementById('m-ext').value.trim()      || '__';
+  const file = document.getElementById('m-filename').value.trim() || 'ApprovalAll.ini';
+  document.getElementById('path-preview').textContent = `ivr2:${ext}/${file}`;
 }
 
 function buildColInputs() {
@@ -644,36 +509,41 @@ function buildColInputs() {
 }
 
 function readSettings() {
-  const authType = document.querySelector('input[name="auth"]:checked').value;
   const labels = {};
   document.querySelectorAll('.col-lbl').forEach(inp => {
-    const c=inp.dataset.col, v=inp.value.trim();
-    if (v&&v!==c) labels[c]=v;
+    const c = inp.dataset.col, v = inp.value.trim();
+    if (v && v !== c) labels[c] = v;
   });
   return {
-    authType,
-    apiKey:    document.getElementById('m-apikey').value.trim(),
-    username:  document.getElementById('m-user').value.trim(),
-    password:  document.getElementById('m-pass').value,
-    tablePath: document.getElementById('m-path').value.trim(),
-    apiBase:   document.getElementById('m-base').value.trim(),
+    apiKey:       document.getElementById('m-apikey').value.trim(),
+    extension:    document.getElementById('m-ext').value.trim(),
+    fileName:     document.getElementById('m-filename').value.trim(),
     columnLabels: labels
   };
 }
 
 async function doTest() {
-  const btn=document.getElementById('test-btn');
-  const res=document.getElementById('test-res');
-  btn.disabled=true; res.textContent='בודק...'; res.className='text-sm text-gray-500';
-  const prev=cfg; cfg=readSettings(); token=null;
+  const btn = document.getElementById('test-btn');
+  const res = document.getElementById('test-res');
+  btn.disabled = true; res.textContent = 'בודק...'; res.className = 'text-sm text-gray-500';
+  const s = readSettings();
+  if (!s.apiKey)    { res.textContent = '❌ נדרש מפתח API';    res.className = 'text-sm text-red-600'; btn.disabled = false; return; }
+  if (!s.extension) { res.textContent = '❌ נדרש מספר שלוחה'; res.className = 'text-sm text-red-600'; btn.disabled = false; return; }
   try {
-    await getToken();
-    res.textContent='✅ חיבור הצליח!'; res.className='text-sm text-green-600 font-semibold';
+    const r = await fetch('/api/get-data', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token: s.apiKey, extension: s.extension, fileName: s.fileName || '' })
+    });
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.message);
+    res.textContent = `✅ חיבור הצליח! נמצאו ${d.rows?.length ?? 0} רשומות`;
+    res.className = 'text-sm text-green-600 font-semibold';
   } catch(e) {
-    res.textContent='❌ '+e.message; res.className='text-sm text-red-600';
-    cfg=prev; token=null;
+    res.textContent = '❌ ' + e.message;
+    res.className = 'text-sm text-red-600';
   }
-  btn.disabled=false;
+  btn.disabled = false;
 }
 
 async function doSaveLoad() {
@@ -706,10 +576,8 @@ function clearAlert() { document.getElementById('alert').classList.add('hidden')
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── Init ───────────────────────────────────────────────────────────────
-document.querySelectorAll('input[name="auth"]').forEach(r=>r.addEventListener('change',e=>toggleAuth(e.target.value)));
-
 window.addEventListener('DOMContentLoaded', () => {
-  if (cfg.tablePath || cfg.apiKey) doLoad();
+  if (cfg.apiKey && cfg.extension) doLoad();
 });
 </script>
 </body>
