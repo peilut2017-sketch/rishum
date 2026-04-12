@@ -3,66 +3,80 @@ const fetch = require('node-fetch');
 const API_BASE = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
-function parseYmgrContent(raw) {
-  if (!raw || !raw.trim()) return { headers: [], rows: [] };
+// Parse an HTML table returned by RenderYMGRFile?format=html
+// Extracts <tr>/<th>/<td> into { headers, rows }
+function parseHtmlTable(html) {
+  const headers = [];
+  const rows    = [];
 
-  const lines = raw.trim().split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return { headers: [], rows: [] };
+  // Pull all <tr> blocks
+  const trRe   = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
 
-  const headerOrder = [];
-  const headerSet   = new Set();
+  let trMatch;
+  while ((trMatch = trRe.exec(html)) !== null) {
+    const cellBlock = trMatch[1];
+    const cells = [];
+    let cellMatch;
+    const cellRe2 = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    while ((cellMatch = cellRe2.exec(cellBlock)) !== null) {
+      // Strip inner tags, decode basic HTML entities
+      const text = cellMatch[1]
+        .replace(/<[^>]+>/g, '')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+        .trim();
+      cells.push(text);
+    }
+    if (!cells.length) continue;
 
-  const rows = lines.map(line => {
-    const record = {};
-    line.split('*').forEach(pair => {
-      const idx = pair.indexOf('^');
-      if (idx === -1) return;
-      const key = pair.slice(0, idx).trim();
-      const val = pair.slice(idx + 1).trim();
-      if (!key) return;
-      record[key] = val;
-      if (!headerSet.has(key)) { headerSet.add(key); headerOrder.push(key); }
-    });
-    return record;
-  }).filter(r => Object.keys(r).length > 0);
+    if (!headers.length) {
+      // First row → headers
+      headers.push(...cells);
+    } else {
+      const row = {};
+      headers.forEach((h, i) => { row[h] = cells[i] ?? ''; });
+      if (headers.some(h => row[h])) rows.push(row);
+    }
+  }
 
-  return { headers: headerOrder, rows };
+  return { headers, rows };
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, extension, fileName } = req.body;
-
   if (!token)     return res.json({ ok: false, message: 'נדרש מפתח API' });
   if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
   const file = fileName || 'APPROVALALL.YMGR';
   const ext  = String(extension).replace(/^\//, '');
-  const path = `ivr2:${ext}/${file}`;
-  // token both in URL and header for maximum compatibility
-  const url  = `${API_BASE}/DownloadFile?path=${enc(path)}&token=${enc(token)}`;
+  const what = `ivr2:${ext}/${file}`;
+
+  // RenderYMGRFile with format=html returns a readable HTML table
+  const url = `${API_BASE}/RenderYMGRFile?what=${enc(what)}&format=html&token=${enc(token)}`;
 
   try {
     const r    = await fetch(url, { headers: { authorization: token } });
-    const text = await r.text();
+    const html = await r.text();
 
-    if (!text || !text.trim()) {
+    if (!html || !html.trim()) {
       return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
     }
 
-    if (text.trimStart().startsWith('<')) {
-      return res.json({ ok: false, message: `שגיאת שרת ${r.status} — בדוק token ומספר שלוחה`, debug: text.slice(0, 200) });
+    if (!html.includes('<') ) {
+      // Not HTML — unexpected plain text
+      return res.json({ ok: false, message: 'פורמט לא צפוי מהשרת', rawPreview: html.slice(0, 400) });
     }
 
-    const parsed = parseYmgrContent(text);
+    const parsed = parseHtmlTable(html);
 
     if (!parsed.rows.length) {
-      // File exists but couldn't parse as YMGR — return raw for debugging
-      return res.json({ ok: false, message: 'הקובץ נמצא אך לא ניתן לפרסר — פורמט לא צפוי', debug: text.slice(0, 300) });
+      return res.json({ ok: false, message: 'הקובץ נמצא אך לא נמצאו שורות נתונים', rawPreview: html.slice(0, 500) });
     }
 
-    res.json({ ok: true, ...parsed, raw: text });
+    res.json({ ok: true, ...parsed });
 
   } catch (e) {
     res.status(502).json({ ok: false, message: e.message });

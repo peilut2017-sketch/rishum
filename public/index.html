@@ -248,7 +248,13 @@ async function fetchData() {
     body: JSON.stringify({ token: cfg.apiKey, extension: cfg.extension, fileName: cfg.fileName || '' })
   });
   const d = await r.json();
-  if (!d.ok) throw new Error(d.message || 'שגיאה בטעינת נתונים');
+  if (!d.ok) {
+    // Show raw preview in a details block if available
+    const preview = d.rawPreview
+      ? `\n\nתוכן גולמי:\n${d.rawPreview}`
+      : '';
+    throw new Error((d.message || 'שגיאה בטעינת נתונים') + preview);
+  }
   return d;
 }
 
