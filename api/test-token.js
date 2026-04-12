@@ -1,7 +1,6 @@
 const fetch = require('node-fetch');
 
-const API_BASE = 'https://www.call2all.co.il/ymot/api';
-const enc = encodeURIComponent;
+const API_BASE = 'https://www.call2all.co.il/ym/api';
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -9,34 +8,50 @@ module.exports = async (req, res) => {
   const { token } = req.body;
   if (!token) return res.json({ ok: false, message: 'נדרש token' });
 
-  // Call RenderYMGRFile with a root path — any valid JSON response means
-  // the API is reachable and the token is accepted.
-  const url = `${API_BASE}/RenderYMGRFile?token=${enc(token)}&path=${enc('ivr2:/')}`;
+  // Call RenderYMGRFile with a dummy path.
+  // - If token is INVALID  → responseStatus error about auth/token
+  // - If token is VALID    → responseStatus error about path (file not found) — that's OK!
+  // - If response is HTML  → server unreachable
+  const body = new URLSearchParams({ wath: 'ivr2:_test_', convertType: 'json', token });
 
   try {
-    const r    = await fetch(url, { timeout: 8000 });
+    const r    = await fetch(`${API_BASE}/RenderYMGRFile`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', authorization: token },
+      body:    body.toString(),
+    });
     const text = await r.text();
 
     if (!text || !text.trim()) {
       return res.json({ ok: false, message: 'השרת לא החזיר תגובה' });
     }
-
-    // HTML → server/network error
     if (text.trimStart().startsWith('<')) {
-      return res.json({ ok: false, message: 'לא ניתן להתחבר לשרת ימות המשיח' });
+      return res.json({ ok: false, message: 'לא ניתן להגיע לשרת ימות המשיח' });
     }
 
-    // Any non-HTML response (JSON or plain text) means we reached the API
-    try {
-      const json = JSON.parse(text);
-      const msg  = (json.message || '').toLowerCase();
-      // Auth-specific failures
-      if (msg.includes('token') || msg.includes('auth') || msg.includes('login') || msg.includes('invalid')) {
-        return res.json({ ok: false, message: 'מפתח API לא תקין — ' + json.message });
-      }
-    } catch { /* plain text is fine */ }
+    let json;
+    try { json = JSON.parse(text); } catch {
+      // Any non-HTML, non-JSON response means we reached the API — token OK
+      return res.json({ ok: true });
+    }
 
+    if (json.responseStatus === 'OK') {
+      return res.json({ ok: true });
+    }
+
+    // Check if it's an auth error or just a path error
+    const msg = (json.message || json.responseStatus || '').toLowerCase();
+    const isAuthError = msg.includes('token') || msg.includes('auth') ||
+                        msg.includes('login') || msg.includes('unauthorized') ||
+                        msg.includes('permission');
+
+    if (isAuthError) {
+      return res.json({ ok: false, message: `מפתח API לא תקין: ${json.message || json.responseStatus}` });
+    }
+
+    // Path/file error = token is valid, API is reachable
     return res.json({ ok: true });
+
   } catch (e) {
     return res.status(502).json({ ok: false, message: e.message });
   }

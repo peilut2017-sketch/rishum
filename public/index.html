@@ -155,11 +155,15 @@
 
       <!-- ── Step 1: Token ── -->
       <div id="wiz-step-1">
-        <p class="text-sm text-gray-500 mb-5">הכנס את מפתח ה-API של מערכת ימות המשיח שלך</p>
+        <p class="text-sm text-gray-500 mb-5">הכנס את מפתח ה-API של מערכת ימות המשיח ובדוק חיבור</p>
         <label class="block text-sm font-semibold text-gray-700 mb-1">🔑 מפתח API (Token)</label>
         <input id="m-apikey" type="text" placeholder="הדבק כאן את מפתח ה-API"
           oninput="onTokenInput()"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 mb-3">
+        <button onclick="doTestToken()" id="test-token-btn"
+          class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm px-5 py-2 rounded-lg transition" disabled>
+          🔗 בדוק חיבור
+        </button>
         <div id="token-status" class="mt-3 text-sm"></div>
       </div>
 
@@ -625,21 +629,48 @@ function _populateConfirmStep() {
   document.getElementById('confirm-path').textContent  = `ivr2:${wizExt}/${wizFile}`;
 }
 
-// ── Step 1: Token input handler ────────────────────────────────────────
+// ── Step 1: Token input + test ─────────────────────────────────────────
 function onTokenInput() {
+  const key = document.getElementById('m-apikey').value.trim();
+  const btn = document.getElementById('test-token-btn');
+  const status = document.getElementById('token-status');
+  if (btn) btn.disabled = !key;
+  if (!key) { wizToken = ''; status.textContent = ''; }
+}
+
+async function doTestToken() {
   const key    = document.getElementById('m-apikey').value.trim();
   const status = document.getElementById('token-status');
+  const btn    = document.getElementById('test-token-btn');
   const nxt    = document.getElementById('wiz-next');
-  if (key) {
-    wizToken = key;
-    status.innerHTML = '✅ מפתח הוזן — לחץ "הבא" להמשיך';
-    status.className = 'mt-3 text-sm text-green-600';
-    if (nxt) nxt.disabled = false;
-  } else {
-    wizToken = '';
-    status.textContent = '';
-    if (nxt) nxt.disabled = true;
+  if (!key) return;
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="text-gray-400">בודק חיבור לשרת...</span>';
+
+  try {
+    const r = await fetch('/api/test-token', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token: key })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      wizToken = key;
+      status.innerHTML = '✅ <strong>החיבור הצליח!</strong> מפתח ה-API תקין';
+      status.className = 'mt-3 text-sm text-green-600';
+      if (nxt) nxt.disabled = false;
+    } else {
+      wizToken = '';
+      status.textContent = '❌ ' + (d.message || 'שגיאת חיבור');
+      status.className = 'mt-3 text-sm text-red-600';
+      if (nxt) nxt.disabled = true;
+    }
+  } catch(e) {
+    status.textContent = '❌ ' + e.message;
+    status.className = 'mt-3 text-sm text-red-600';
   }
+  btn.disabled = false;
 }
 
 // ── Step 2: Select file ────────────────────────────────────────────────
