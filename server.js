@@ -62,6 +62,12 @@ app.post('/api/get-data', async (req, res) => {
   }
 });
 
+// ─── List files in a path (tries sibling paths) ───────────────────────────────
+app.post('/api/list-files', async (req, res) => {
+  const listFiles = require('./api/list-files');
+  return listFiles(req, res);
+});
+
 // ─── Generic proxy (for advanced / custom endpoints) ──────────────────────────
 app.post('/api/proxy', async (req, res) => {
   const { url } = req.body;

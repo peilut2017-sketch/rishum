@@ -1,8 +1,9 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/api/login",    "dest": "/api/login.js" },
-    { "src": "/api/get-data", "dest": "/api/get-data.js" },
+    { "src": "/api/login",      "dest": "/api/login.js" },
+    { "src": "/api/get-data",   "dest": "/api/get-data.js" },
+    { "src": "/api/list-files", "dest": "/api/list-files.js" },
     { "src": "/",             "dest": "/public/index.html" },
     { "src": "/(.*)",         "dest": "/public/$1" }
   ]

@@ -175,11 +175,24 @@
           <button type="button" onclick="document.getElementById('path-tip').classList.toggle('hidden')"
             class="text-blue-500 text-xs mr-1 font-normal">(?)</button>
         </label>
-        <input id="m-path" type="text" placeholder="לדוגמה: /2/1/1"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <div class="flex gap-2">
+          <input id="m-path" type="text" placeholder="לדוגמה: /2/1/1"
+            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+          <button id="search-files-btn" onclick="doSearchFiles()"
+            class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded-lg whitespace-nowrap transition flex items-center gap-1">
+            <span id="search-files-icon">🔍</span>
+            <span id="search-files-label">חפש קבצים</span>
+          </button>
+        </div>
         <div id="path-tip" class="hidden mt-2 p-3 bg-blue-50 rounded-lg text-xs text-blue-700 space-y-1">
           <p>הנתיב מתאים לנתיב השלוחה כפי שמוגדר במערכת ימות המשיח.</p>
           <p>דוגמאות: <code>/2/1/1</code> &nbsp;|&nbsp; <code>0/5000</code> &nbsp;|&nbsp; <code>2/1/1</code></p>
+        </div>
+
+        <!-- Found files list -->
+        <div id="files-found" class="hidden mt-3 space-y-2">
+          <p class="text-xs font-semibold text-gray-500 mb-1">קבצים שנמצאו – לחץ לבחירה:</p>
+          <div id="files-list" class="space-y-2 max-h-64 overflow-y-auto"></div>
         </div>
       </div>
 
@@ -485,6 +498,78 @@ async function doLoad() {
 
 async function doRefresh() { token=null; await doLoad(); }
 
+// ── File browser ───────────────────────────────────────────────────────
+async function doSearchFiles() {
+  const btn   = document.getElementById('search-files-btn');
+  const icon  = document.getElementById('search-files-icon');
+  const label = document.getElementById('search-files-label');
+  const box   = document.getElementById('files-found');
+  const list  = document.getElementById('files-list');
+
+  const basePath = document.getElementById('m-path').value.trim();
+  if (!basePath) { alert('הכנס נתיב שלוחה קודם'); return; }
+
+  // Get temp token from form
+  const tmpCfg = readSettings();
+  const prevCfg = cfg; cfg = tmpCfg; token = null;
+
+  btn.disabled = true;
+  icon.textContent = '⏳';
+  label.textContent = 'מחפש...';
+  box.classList.add('hidden');
+
+  try {
+    await getToken();
+    const r = await fetch('/api/list-files', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token, basePath, apiBase: tmpCfg.apiBase })
+    });
+    const d = await r.json();
+
+    if (!d.ok) throw new Error(d.message || 'שגיאה בחיפוש קבצים');
+
+    if (!d.files || d.files.length === 0) {
+      list.innerHTML = '<p class="text-sm text-gray-400 py-2">לא נמצאו קבצים בנתיב זה</p>';
+    } else {
+      list.innerHTML = d.files.map(f => `
+        <button type="button" onclick="selectFile('${esc(f.path)}')"
+          class="w-full text-right bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg px-4 py-3 transition group">
+          <div class="flex items-center justify-between">
+            <span class="font-mono text-sm font-semibold text-blue-700">${esc(f.path)}</span>
+            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full group-hover:bg-blue-200">
+              ${f.rowCount} רשומות
+            </span>
+          </div>
+          ${f.headers && f.headers.length ? `
+            <p class="text-xs text-gray-400 mt-1 truncate">
+              עמודות: ${f.headers.slice(0,6).map(h=>esc(h)).join(' · ')}${f.headers.length>6?' …':''}
+            </p>` : ''}
+        </button>
+      `).join('');
+    }
+
+    box.classList.remove('hidden');
+  } catch(e) {
+    list.innerHTML = `<p class="text-sm text-red-500 py-2">❌ ${esc(e.message)}</p>`;
+    box.classList.remove('hidden');
+    cfg = prevCfg; token = null;
+  }
+
+  btn.disabled = false;
+  icon.textContent = '🔍';
+  label.textContent = 'חפש קבצים';
+}
+
+function selectFile(path) {
+  document.getElementById('m-path').value = path;
+  // Highlight selection
+  document.querySelectorAll('#files-list button').forEach(b => {
+    b.classList.toggle('ring-2', b.getAttribute('onclick').includes(path));
+    b.classList.toggle('ring-blue-500', b.getAttribute('onclick').includes(path));
+  });
+}
+
 // ── Settings modal ─────────────────────────────────────────────────────
 function openSettings() {
   const auth = cfg.authType||'apikey';
@@ -498,6 +583,7 @@ function openSettings() {
   if (headers.length) buildColInputs();
   document.getElementById('col-section').classList.toggle('hidden', !headers.length);
   document.getElementById('test-res').textContent='';
+  document.getElementById('files-found').classList.add('hidden');
   document.getElementById('modal').classList.remove('hidden');
 }
 function closeSettings() { document.getElementById('modal').classList.add('hidden'); }
