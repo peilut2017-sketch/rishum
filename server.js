@@ -88,7 +88,12 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀  מערכת ניהול ימות המשיח פועלת`);
   console.log(`📱  פתח בדפדפן: http://localhost:${PORT}\n`);
+});
+
+// Reject WebSocket upgrade attempts gracefully (prevents "Invalid WS request" log spam)
+server.on('upgrade', (req, socket) => {
+  socket.end('HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\n\r\n');
 });
