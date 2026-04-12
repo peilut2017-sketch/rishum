@@ -34,7 +34,7 @@ module.exports = async (req, res) => {
   if (!token)     return res.json({ ok: false, message: 'נדרש מפתח API' });
   if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
-  const file = fileName || 'ApprovalAll.ini';
+  const file = fileName || 'ApprovalAll.ymgr';
   const ext  = String(extension).replace(/^\//, ''); // strip leading slash
   const path = `ivr2:${ext}/${file}`;
   const url  = `${API_BASE}/GetTextFile?token=${enc(token)}&path=${enc(path)}`;

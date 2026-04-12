@@ -3,7 +3,7 @@ const fetch = require('node-fetch');
 const API_BASE = 'https://www.call2all.co.il/ymot/api';
 const enc = encodeURIComponent;
 
-const COMMON_FILES = ['ApprovalAll.ini', 'All.ini', 'data.ini', 'Data.ini', 'FormData.ini', 'records.ini'];
+const COMMON_FILES = ['ApprovalAll.ymgr', 'ApprovalAll.ini', 'All.ini', 'data.ini', 'Data.ini', 'FormData.ini', 'records.ini'];
 
 async function tryFile(token, ext, fileName) {
   const path = `ivr2:${ext}/${fileName}`;

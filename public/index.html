@@ -157,7 +157,7 @@
         </div>
         <!-- Dynamic path preview -->
         <p class="text-xs text-gray-400 mt-1">
-          נתיב שייווצר: <code id="path-preview" class="text-blue-600">ivr2:__/ApprovalAll.ini</code>
+          נתיב שייווצר: <code id="path-preview" class="text-blue-600">ivr2:__/ApprovalAll.ymgr</code>
         </p>
 
         <!-- Found files list -->
@@ -171,9 +171,9 @@
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">
           שם קובץ
-          <span class="text-gray-400 text-xs font-normal">(ברירת מחדל: ApprovalAll.ini)</span>
+          <span class="text-gray-400 text-xs font-normal">(ברירת מחדל: ApprovalAll.ymgr)</span>
         </label>
-        <input id="m-filename" type="text" placeholder="ApprovalAll.ini"
+        <input id="m-filename" type="text" placeholder="ApprovalAll.ymgr"
           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
       </div>
 
@@ -394,7 +394,7 @@ async function doLoad() {
     document.getElementById('search').value='';
     setState('table');
     render();
-    const file = cfg.fileName || 'ApprovalAll.ini';
+    const file = cfg.fileName || 'ApprovalAll.ymgr';
     document.getElementById('nav-sub').textContent =
       `ivr2:${cfg.extension}/${file} · ${allRows.length.toLocaleString()} רשומות`;
     showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
@@ -492,7 +492,7 @@ function closeSettings() { document.getElementById('modal').classList.add('hidde
 
 function updatePathPreview() {
   const ext  = document.getElementById('m-ext').value.trim()      || '__';
-  const file = document.getElementById('m-filename').value.trim() || 'ApprovalAll.ini';
+  const file = document.getElementById('m-filename').value.trim() || 'ApprovalAll.ymgr';
   document.getElementById('path-preview').textContent = `ivr2:${ext}/${file}`;
 }
 
