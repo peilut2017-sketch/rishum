@@ -52,7 +52,7 @@ module.exports = async (req, res) => {
 
   const file = fileName || 'APPROVALALL.YMGR';
   const ext  = String(extension).replace(/^\//, '');
-  const what = `ivr2:${ext}/${file}`;
+  const what = `ivr2:/${ext}/${file}`;
 
   // RenderYMGRFile with format=html returns a readable HTML table
   const url = `${API_BASE}/RenderYMGRFile?wath=${enc(what)}&format=html&token=${enc(token)}`;
