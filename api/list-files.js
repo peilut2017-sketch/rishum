@@ -1,87 +1,101 @@
 const fetch = require('node-fetch');
 
-const DEFAULT_BASE = 'https://www.call2all.co.il/ym/api';
+const DL_URL = 'https://www.call2all.co.il/ym/dl.php';
 const enc = encodeURIComponent;
 
-function fetchWithTimeout(url, ms = 5000) {
+const COMMON_FILENAMES = [
+  'ApprovalAll.ini', 'All.ini', 'data.ini', 'Data.ini',
+  'registrations.ini', 'form.ini', 'FormData.ini',
+  'records.ini', 'output.ini', 'results.ini',
+  '1.ini', '2.ini', '3.ini'
+];
+
+function withTimeout(promise, ms = 5000) {
   return Promise.race([
-    fetch(url),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+    promise,
+    new Promise((_, r) => setTimeout(() => r(new Error('timeout')), ms))
   ]);
 }
 
-async function tryPath(base, token, path) {
-  // Try the two most likely endpoints for this path
-  const urls = [
-    `${base}/GetIvrTables?token=${enc(token)}&path=${enc(path)}`,
-    `${base}/GetTextFile?token=${enc(token)}&path=${enc(path)}`,
-  ];
+async function tryFetch(token, what) {
+  const url = `${DL_URL}?token=${enc(token)}&what=${enc(what)}`;
+  try {
+    const r = await withTimeout(fetch(url), 5000);
+    const text = await r.text();
+    if (!text || !text.trim()) return null;
+    const t = text.trim();
+    if (/invalid|error|not.?found|forbidden/i.test(t) && !t.includes(',')) return null;
 
-  for (const url of urls) {
-    try {
-      const r = await fetchWithTimeout(url, 4000);
-      const text = await r.text();
-      if (!text || !text.trim()) continue;
-
-      try {
-        const json = JSON.parse(text);
-        if (json.responseStatus === 'ERROR' || json.responseStatus === 'NOT_AUTHENTICATED') continue;
-        if (typeof json.table === 'string') return parseInfo(path, json.table);
-        return { path, type: 'json', headers: [], rowCount: '?' };
-      } catch {
-        const info = parseInfo(path, text);
-        if (info) return info;
-      }
-    } catch {
-      // skip failed attempts
-    }
+    // Parse headers and row count
+    const lines = t.split(/\r?\n/).filter(l => l.trim());
+    if (!lines.length || !lines[0].includes(',')) return null;
+    const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim()).filter(Boolean);
+    const rowCount = Math.max(0, lines.length - 1);
+    return { path: what, headers, rowCount };
+  } catch {
+    return null;
   }
-  return null;
 }
 
-function parseInfo(path, csvText) {
-  const lines = csvText.trim().split(/\r?\n/).filter(l => l.trim());
-  if (!lines.length) return null;
-  // Must look like CSV (has comma) to be considered a real data file
-  if (!lines[0].includes(',') && lines.length < 2) return null;
-  const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim()).filter(Boolean);
-  const rowCount = Math.max(0, lines.length - 1);
-  return { path, type: 'csv', headers, rowCount };
+// Extract the base directory from a full path or ivr2: reference
+function extractDir(basePath) {
+  const s = basePath.trim();
+
+  // Full dl.php URL
+  if (s.includes('dl.php')) {
+    try {
+      const u = new URL(s.startsWith('http') ? s : 'https://www.call2all.co.il' + s);
+      const w = u.searchParams.get('what') || '';
+      const noProto = w.startsWith('ivr2:') ? w.slice(5) : w;
+      const parts = noProto.split('/');
+      parts.pop(); // remove filename
+      return parts.join('/');
+    } catch {}
+  }
+
+  // ivr2:dir/file  or  ivr2:dir/
+  if (s.startsWith('ivr2:')) {
+    const inner = s.slice(5);
+    const parts = inner.split('/');
+    if (!inner.endsWith('/')) parts.pop();
+    return parts.join('/');
+  }
+
+  // Plain path like /2/1/1 or /2/1
+  const plain = s.replace(/^\//, '');
+  const parts = plain.split('/');
+  if (!s.endsWith('/') && !s.includes('.')) parts.pop();
+  return parts.join('/');
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { token, basePath, apiBase } = req.body;
-  const base = (apiBase || DEFAULT_BASE).replace(/\/$/, '');
+  const { token, basePath } = req.body;
+  const dir = extractDir(basePath);
 
-  // Explore CHILDREN of basePath: basePath/1 … basePath/9
-  // Also try basePath itself in case it's a direct file
-  const normalized = basePath.replace(/\/$/, '');
-  const withoutSlash = normalized.startsWith('/') ? normalized.slice(1) : normalized;
-  const withSlash = normalized.startsWith('/') ? normalized : '/' + normalized;
+  // Build list of what= values to try
+  const toTry = COMMON_FILENAMES.map(f => `ivr2:${dir}/${f}`);
 
-  const pathsToTry = new Set();
-
-  // The path itself (in case it IS a file)
-  pathsToTry.add(withSlash);
-  pathsToTry.add(withoutSlash);
-
-  // Children /1 through /9
-  for (let i = 1; i <= 9; i++) {
-    pathsToTry.add(`${withSlash}/${i}`);
-    pathsToTry.add(`${withoutSlash}/${i}`);
+  // Also add the basePath itself if it looks like a file
+  if (basePath.includes('.ini')) {
+    const s = basePath.trim();
+    if (s.startsWith('ivr2:')) toTry.unshift(s);
+    else if (s.includes('dl.php')) {
+      try {
+        const u = new URL(s.startsWith('http') ? s : 'https://www.call2all.co.il' + s);
+        const w = u.searchParams.get('what');
+        if (w) toTry.unshift(w);
+      } catch {}
+    }
   }
 
-  const attempts = [...pathsToTry].map(p => tryPath(base, token, p));
-  const results = await Promise.all(attempts);
+  const results = await Promise.all(toTry.map(what => tryFetch(token, what)));
 
-  // Deduplicate by path (keep unique paths only)
   const seen = new Set();
   const found = results.filter(r => {
     if (!r) return false;
-    // Normalize path for dedup
-    const key = r.path.replace(/^\//, '');
+    const key = r.path.replace(/^ivr2:/, '');
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

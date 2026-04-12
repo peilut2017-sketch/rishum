@@ -1,75 +1,95 @@
 const fetch = require('node-fetch');
 
-const DEFAULT_BASE = 'https://www.call2all.co.il/ym/api';
+const DL_URL  = 'https://www.call2all.co.il/ym/dl.php';
+const API_URL = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
-// All endpoint+parameter combinations to try, in priority order
-function buildUrls(base, token, path) {
-  const p  = path;
-  const p2 = path.startsWith('/') ? path.slice(1) : '/' + path;  // alternate slash variant
-
-  return [
-    // Most common ימות המשיח endpoints
-    `${base}/GetIvrTables?token=${enc(token)}&path=${enc(p)}`,
-    `${base}/GetIvrTables?token=${enc(token)}&path=${enc(p2)}`,
-    `${base}/GetTextFile?token=${enc(token)}&path=${enc(p)}`,
-    `${base}/GetTextFile?token=${enc(token)}&path=${enc(p2)}`,
-    `${base}/GetFile?token=${enc(token)}&path=${enc(p)}`,
-    `${base}/GetFile?token=${enc(token)}&path=${enc(p2)}`,
-    // Try with "fileName" param instead of "path"
-    `${base}/GetIvrTables?token=${enc(token)}&fileName=${enc(p)}`,
-    `${base}/GetIvrTables?token=${enc(token)}&fileName=${enc(p2)}`,
-    // Try with "name" param
-    `${base}/GetIvrTables?token=${enc(token)}&name=${enc(p)}`,
-  ];
+// Extract the "what" value from various input formats:
+//   Full URL:  https://www.call2all.co.il/ym/dl.php?what=ivr2:2/1/Foo.ini
+//   ivr2 path: ivr2:2/1/Foo.ini
+//   Plain path: /2/1/1  (legacy, try as ivr2:)
+function extractWhat(tablePath) {
+  const s = tablePath.trim();
+  // Full dl.php URL
+  if (s.includes('dl.php')) {
+    try {
+      const u = new URL(s.startsWith('http') ? s : 'https://www.call2all.co.il' + s);
+      const w = u.searchParams.get('what');
+      if (w) return { what: w };
+    } catch {}
+  }
+  // Already has ivr2: prefix
+  if (s.startsWith('ivr2:')) return { what: s };
+  // Legacy plain path → wrap as ivr2:
+  const plain = s.startsWith('/') ? s.slice(1) : s;
+  return { what: `ivr2:${plain}`, legacy: true };
 }
 
-async function tryUrl(url) {
-  try {
-    const r = await fetch(url);
-    const text = await r.text();
-    if (!text || !text.trim()) return null;
+// Parse text response into { format, data }
+// ימות המשיח .ini data files are CSV-like (first row = headers)
+function parseBody(text) {
+  if (!text || !text.trim()) return null;
+  const t = text.trim();
 
-    try {
-      const json = JSON.parse(text);
-      if (json.responseStatus === 'ERROR' || json.responseStatus === 'NOT_AUTHENTICATED') return null;
-      if (typeof json.table === 'string') return { ok: true, format: 'csv', data: json.table, url };
-      return { ok: true, format: 'json', data: json, url };
-    } catch {
-      // Plain text/CSV — only accept if it looks like tabular data
-      const lines = text.trim().split('\n');
-      if (lines.length >= 1 && lines[0].includes(',')) {
-        return { ok: true, format: 'csv', data: text.trim(), url };
-      }
-      return null;
+  // JSON response
+  try {
+    const json = JSON.parse(t);
+    if (json.responseStatus === 'ERROR' || json.responseStatus === 'NOT_AUTHENTICATED') {
+      return { error: json.message || json.responseStatus };
     }
-  } catch {
-    return null;
+    if (typeof json.table === 'string') return { format: 'csv', data: json.table };
+    return { format: 'json', data: json };
+  } catch {}
+
+  // Detect error strings
+  if (/invalid|error|not.?found|forbidden/i.test(t) && !t.includes(',')) {
+    return { error: t.slice(0, 200) };
   }
+
+  // Treat as CSV / INI data
+  return { format: 'csv', data: t };
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
   const { token, tablePath, apiBase } = req.body;
-  const base = (apiBase || DEFAULT_BASE).replace(/\/$/, '');
+  const { what, legacy } = extractWhat(tablePath);
 
-  const urls = buildUrls(base, token, tablePath);
+  // Auth variants to try for dl.php
+  const authVariants = [
+    `${DL_URL}?token=${enc(token)}&what=${enc(what)}`,
+    `${DL_URL}?apiKey=${enc(token)}&what=${enc(what)}`,
+    `${DL_URL}?key=${enc(token)}&what=${enc(what)}`,
+    `${DL_URL}?what=${enc(what)}&token=${enc(token)}`,
+  ];
+
+  // If legacy path, also try old GetIvrTables
+  const legacyVariants = legacy ? [
+    `${(apiBase || API_URL).replace(/\/$/, '')}/GetIvrTables?token=${enc(token)}&path=${enc(tablePath)}`,
+    `${(apiBase || API_URL).replace(/\/$/, '')}/GetTextFile?token=${enc(token)}&path=${enc(tablePath)}`,
+  ] : [];
+
+  const allUrls = [...authVariants, ...legacyVariants];
 
   try {
-    // Try all URLs in parallel, return first success
-    const results = await Promise.all(urls.map(tryUrl));
-    const success = results.find(r => r && r.ok);
+    for (const url of allUrls) {
+      let text;
+      try {
+        const r = await fetch(url);
+        text = await r.text();
+      } catch { continue; }
 
-    if (success) {
-      return res.json({ ok: true, format: success.format, data: success.data });
+      const parsed = parseBody(text);
+      if (!parsed) continue;
+      if (parsed.error) continue;   // this URL returned an error, try next
+      return res.json({ ok: true, format: parsed.format, data: parsed.data });
     }
 
-    // All failed — return helpful message
+    // All failed
     res.json({
       ok: false,
-      message: `לא נמצאו נתונים בנתיב "${tablePath}". נסה endpoint או נתיב אחר בהגדרות.`,
-      triedUrls: urls
+      message: 'לא ניתן לטעון את הנתונים. ודא שהנתיב בפורמט: ivr2:2/1/ApprovalAll.ini'
     });
   } catch (e) {
     res.status(502).json({ ok: false, message: e.message });
