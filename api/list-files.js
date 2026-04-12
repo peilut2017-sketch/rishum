@@ -13,9 +13,18 @@ async function tryFile(token, ext, fileName) {
       fetch(url),
       new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
     ]);
-    const json = await r.json();
-    if (json.responseStatus !== 'OK') return null;
-    const content = json.file ?? json.content ?? json.data ?? json.text ?? '';
+    const text = await r.text();
+    if (!text || !text.trim()) return null;
+
+    // Try JSON envelope first, fall back to raw text as file content
+    let content = null;
+    try {
+      const json = JSON.parse(text);
+      if (json.responseStatus && json.responseStatus !== 'OK') return null;
+      content = json.file ?? json.content ?? json.data ?? json.text ?? null;
+    } catch {
+      content = text;
+    }
     if (!content || !content.trim()) return null;
 
     const lines = content.trim().split(/\r?\n/).filter(l => l.trim());

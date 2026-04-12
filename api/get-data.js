@@ -41,21 +41,24 @@ module.exports = async (req, res) => {
 
   try {
     const r = await fetch(url);
+    const text = await r.text();
 
-    // ימות המשיח returns JSON with responseStatus + file content
-    let json;
+    if (!text || !text.trim()) {
+      return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
+    }
+
+    // Try to parse as JSON (ימות המשיח wraps content in JSON envelope)
+    let content = null;
     try {
-      json = await r.json();
+      const json = JSON.parse(text);
+      if (json.responseStatus && json.responseStatus !== 'OK') {
+        return res.json({ ok: false, message: json.message || json.responseStatus || 'שגיאת API' });
+      }
+      content = json.file ?? json.content ?? json.data ?? json.text ?? null;
     } catch {
-      return res.json({ ok: false, message: 'תגובה לא תקינה מהשרת' });
+      // Not JSON — treat the raw response as the file content directly
+      content = text;
     }
-
-    if (json.responseStatus !== 'OK') {
-      return res.json({ ok: false, message: json.message || json.responseStatus || 'שגיאת API' });
-    }
-
-    // File content may be in different fields depending on API version
-    const content = json.file ?? json.content ?? json.data ?? json.text ?? '';
 
     if (!content || !content.trim()) {
       return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
