@@ -1,9 +1,8 @@
 const fetch = require('node-fetch');
 
 const API_BASE = 'https://www.call2all.co.il/ym/api';
-const enc = encodeURIComponent;
 
-// Parse HTML table returned by RenderYMGRFile?format=html
+// Parse HTML table from RenderYMGRFile?format=html
 function parseHtmlTable(html) {
   const headers = [];
   const rows    = [];
@@ -11,13 +10,14 @@ function parseHtmlTable(html) {
   let trMatch;
 
   while ((trMatch = trRe.exec(html)) !== null) {
-    const cells = [];
-    const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    const cells   = [];
+    const cellRe  = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
     let cm;
     while ((cm = cellRe.exec(trMatch[1])) !== null) {
       let val = cm[1].replace(/<[^>]+>/g, '').trim()
-        .replace(/&amp;/g,  '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
         .replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      // Data may arrive URI-encoded
       try { val = decodeURIComponent(val); } catch { /* keep as-is */ }
       cells.push(val);
     }
@@ -42,21 +42,30 @@ module.exports = async (req, res) => {
   if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
   const file = (fileName || 'ApprovalAll.ymgr').trim();
-  const ext  = String(extension).replace(/^\/+/, ''); // strip any leading slashes
-  const what = `ivr2:${ext}/${file}`;                 // e.g. ivr2:5/ApprovalAll.ymgr
+  const ext  = String(extension).replace(/^\/+/, '');
+  const what = `ivr2:${ext}/${file}`;   // e.g. ivr2:5/ApprovalAll.ymgr
 
-  // Note: the API parameter has a server-side typo — 'wath' not 'what'
-  const url = `${API_BASE}/RenderYMGRFile?wath=${enc(what)}&format=html&token=${enc(token)}`;
+  // Use POST so URLSearchParams handles encoding — avoids double-encoding issues
+  // API has server-side typo: parameter is 'wath' not 'what'
+  const body = new URLSearchParams({ wath: what, format: 'html', token });
 
   try {
-    const r    = await fetch(url, { headers: { authorization: token } });
+    const r = await fetch(`${API_BASE}/RenderYMGRFile`, {
+      method:  'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        authorization:  token,
+      },
+      body: body.toString(),
+    });
+
     const text = await r.text();
 
     if (!text || !text.trim()) {
       return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
     }
 
-    // If response is not HTML — may be a JSON error from the API
+    // Non-HTML → probably a JSON error from the API
     if (!text.trimStart().startsWith('<')) {
       try {
         const json = JSON.parse(text);

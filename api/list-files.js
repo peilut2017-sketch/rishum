@@ -1,7 +1,6 @@
 const fetch = require('node-fetch');
 
 const API_BASE = 'https://www.call2all.co.il/ym/api';
-const enc = encodeURIComponent;
 
 const COMMON_FILES = [
   'ApprovalAll.ymgr', 'approvalall.ymgr', 'approval_all.ymgr',
@@ -9,11 +8,15 @@ const COMMON_FILES = [
 ];
 
 async function tryFile(token, ext, fileName) {
-  const what = `ivr2:${ext}/${fileName}`;   // no leading slash: ivr2:EXT/FILE
-  const url  = `${API_BASE}/RenderYMGRFile?wath=${enc(what)}&format=html&token=${enc(token)}`;
+  const what = `ivr2:${ext}/${fileName}`;
+  const body = new URLSearchParams({ wath: what, format: 'html', token });
   try {
-    const r    = await Promise.race([
-      fetch(url, { headers: { authorization: token } }),
+    const r = await Promise.race([
+      fetch(`${API_BASE}/RenderYMGRFile`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', authorization: token },
+        body:    body.toString(),
+      }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 7000))
     ]);
     const html = await r.text();
