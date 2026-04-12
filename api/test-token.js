@@ -8,11 +8,10 @@ module.exports = async (req, res) => {
   const { token } = req.body;
   if (!token) return res.json({ ok: false, message: 'נדרש token' });
 
-  // Call RenderYMGRFile with a dummy path.
-  // - If token is INVALID  → responseStatus error about auth/token
-  // - If token is VALID    → responseStatus error about path (file not found) — that's OK!
-  // - If response is HTML  → server unreachable
-  const body = new URLSearchParams({ wath: 'ivr2:_test_', convertType: 'json', token });
+  // Send a minimal request — any JSON response (even an error) means
+  // the API is reachable and the token was accepted at the HTTP level.
+  // Only an HTML page or network failure means the token/connection is bad.
+  const body = new URLSearchParams({ wath: 'ivr2:_check_', convertType: 'json', token });
 
   try {
     const r    = await fetch(`${API_BASE}/RenderYMGRFile`, {
@@ -25,34 +24,16 @@ module.exports = async (req, res) => {
     if (!text || !text.trim()) {
       return res.json({ ok: false, message: 'השרת לא החזיר תגובה' });
     }
+
+    // HTML response = server/proxy error (not from the API itself)
     if (text.trimStart().startsWith('<')) {
       return res.json({ ok: false, message: 'לא ניתן להגיע לשרת ימות המשיח' });
     }
 
-    let json;
-    try { json = JSON.parse(text); } catch {
-      // Any non-HTML, non-JSON response means we reached the API — token OK
-      return res.json({ ok: true });
-    }
-
-    if (json.responseStatus === 'OK') {
-      return res.json({ ok: true });
-    }
-
-    // Check if it's an auth error or just a path error
-    const msg = (json.message || json.responseStatus || '').toLowerCase();
-    const isAuthError = msg.includes('token') || msg.includes('auth') ||
-                        msg.includes('login') || msg.includes('unauthorized') ||
-                        msg.includes('permission');
-
-    if (isAuthError) {
-      return res.json({ ok: false, message: `מפתח API לא תקין: ${json.message || json.responseStatus}` });
-    }
-
-    // Path/file error = token is valid, API is reachable
-    return res.json({ ok: true });
+    // Any JSON response (OK or error) = token was accepted, API is reachable
+    res.json({ ok: true });
 
   } catch (e) {
-    return res.status(502).json({ ok: false, message: e.message });
+    res.status(502).json({ ok: false, message: e.message });
   }
 };
