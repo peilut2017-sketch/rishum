@@ -1,31 +1,50 @@
 const fetch = require('node-fetch');
 
 const DEFAULT_BASE = 'https://www.call2all.co.il/ym/api';
+const enc = encodeURIComponent;
 
-async function callGetIvrTables(base, token, path) {
-  const url = `${base}/GetIvrTables?token=${encodeURIComponent(token)}&path=${encodeURIComponent(path)}`;
-  const r = await fetch(url);
-  const text = await r.text();
+// All endpoint+parameter combinations to try, in priority order
+function buildUrls(base, token, path) {
+  const p  = path;
+  const p2 = path.startsWith('/') ? path.slice(1) : '/' + path;  // alternate slash variant
 
-  // Try to parse as JSON
+  return [
+    // Most common ימות המשיח endpoints
+    `${base}/GetIvrTables?token=${enc(token)}&path=${enc(p)}`,
+    `${base}/GetIvrTables?token=${enc(token)}&path=${enc(p2)}`,
+    `${base}/GetTextFile?token=${enc(token)}&path=${enc(p)}`,
+    `${base}/GetTextFile?token=${enc(token)}&path=${enc(p2)}`,
+    `${base}/GetFile?token=${enc(token)}&path=${enc(p)}`,
+    `${base}/GetFile?token=${enc(token)}&path=${enc(p2)}`,
+    // Try with "fileName" param instead of "path"
+    `${base}/GetIvrTables?token=${enc(token)}&fileName=${enc(p)}`,
+    `${base}/GetIvrTables?token=${enc(token)}&fileName=${enc(p2)}`,
+    // Try with "name" param
+    `${base}/GetIvrTables?token=${enc(token)}&name=${enc(p)}`,
+  ];
+}
+
+async function tryUrl(url) {
   try {
-    const json = JSON.parse(text);
+    const r = await fetch(url);
+    const text = await r.text();
+    if (!text || !text.trim()) return null;
 
-    // API returned an error
-    if (json.responseStatus && json.responseStatus !== 'OK') {
-      return { ok: false, rawError: json.message || json.responseStatus, raw: text };
+    try {
+      const json = JSON.parse(text);
+      if (json.responseStatus === 'ERROR' || json.responseStatus === 'NOT_AUTHENTICATED') return null;
+      if (typeof json.table === 'string') return { ok: true, format: 'csv', data: json.table, url };
+      return { ok: true, format: 'json', data: json, url };
+    } catch {
+      // Plain text/CSV — only accept if it looks like tabular data
+      const lines = text.trim().split('\n');
+      if (lines.length >= 1 && lines[0].includes(',')) {
+        return { ok: true, format: 'csv', data: text.trim(), url };
+      }
+      return null;
     }
-
-    // JSON with embedded CSV string
-    if (typeof json.table === 'string') {
-      return { ok: true, format: 'csv', data: json.table };
-    }
-
-    return { ok: true, format: 'json', data: json };
   } catch {
-    // Plain CSV text
-    if (!text.trim()) return { ok: false, rawError: 'תגובה ריקה מהשרת', raw: '' };
-    return { ok: true, format: 'csv', data: text.trim() };
+    return null;
   }
 }
 
@@ -35,20 +54,23 @@ module.exports = async (req, res) => {
   const { token, tablePath, apiBase } = req.body;
   const base = (apiBase || DEFAULT_BASE).replace(/\/$/, '');
 
-  // Build list of path variants to try (with and without leading slash)
-  const paths = [tablePath];
-  if (tablePath.startsWith('/')) paths.push(tablePath.slice(1));
-  else paths.push('/' + tablePath);
+  const urls = buildUrls(base, token, tablePath);
 
   try {
-    let lastError = '';
-    for (const p of paths) {
-      const result = await callGetIvrTables(base, token, p);
-      if (result.ok) return res.json(result);
-      lastError = result.rawError || 'שגיאה לא ידועה';
+    // Try all URLs in parallel, return first success
+    const results = await Promise.all(urls.map(tryUrl));
+    const success = results.find(r => r && r.ok);
+
+    if (success) {
+      return res.json({ ok: true, format: success.format, data: success.data });
     }
-    // All paths failed — return the last error with details
-    return res.json({ ok: false, message: `שגיאת API: ${lastError}` });
+
+    // All failed — return helpful message
+    res.json({
+      ok: false,
+      message: `לא נמצאו נתונים בנתיב "${tablePath}". נסה endpoint או נתיב אחר בהגדרות.`,
+      triedUrls: urls
+    });
   } catch (e) {
     res.status(502).json({ ok: false, message: e.message });
   }
