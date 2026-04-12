@@ -39,6 +39,10 @@
         class="touch-btn bg-blue-700 hover:bg-blue-600 text-white text-sm px-3 py-2 rounded-lg gap-1 transition">
         <span>🔄</span><span class="hidden sm:inline">רענן</span>
       </button>
+      <button id="lock-btn" onclick="toggleCrudLock()"
+        class="touch-btn text-sm px-3 py-2 rounded-lg gap-1 transition bg-red-800 hover:bg-red-700 text-white">
+        <span id="lock-icon">🔒</span><span class="hidden sm:inline" id="lock-label">נעול</span>
+      </button>
       <button onclick="openSettings()"
         class="touch-btn bg-white text-blue-900 hover:bg-blue-50 text-sm font-semibold px-3 py-2 rounded-lg gap-1 transition">
         <span>⚙️</span><span class="hidden sm:inline">הגדרות</span>
@@ -237,7 +241,24 @@
 
       <!-- ── Step 3: Confirm ── -->
       <div id="wiz-step-3" class="hidden">
-        <p class="text-sm text-gray-500 mb-5">אשר את פרטי החיבור ולחץ "שמור וטען"</p>
+        <p class="text-sm text-gray-500 mb-4">אשר את פרטי החיבור ולחץ "שמור וטען"</p>
+
+        <!-- Lock toggle -->
+        <div class="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+          <div class="min-w-0 pr-3">
+            <p class="text-sm font-semibold text-amber-800">🔒 נעילת עריכת נתונים</p>
+            <p class="text-xs text-amber-600 mt-0.5">כשנעול — כפתורי עריכה/מחיקה/הוספה מושבתים</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+            <input type="checkbox" id="crud-lock-toggle" class="sr-only peer" checked>
+            <div class="w-11 h-6 bg-gray-300 rounded-full peer
+              peer-checked:bg-red-600
+              after:content-[''] after:absolute after:top-[2px] after:right-[2px]
+              after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
+              peer-checked:after:translate-x-[-20px]"></div>
+          </label>
+        </div>
+
         <div class="space-y-2 mb-5">
           <div class="bg-gray-50 rounded-lg px-4 py-3 flex justify-between items-center">
             <span class="text-xs text-gray-500">מפתח API</span>
@@ -439,14 +460,20 @@ function renderTable() {
       `<tr><td colspan="${headers.length + 1}" class="text-center py-12 text-gray-400">לא נמצאו רשומות</td></tr>`;
     return;
   }
+  const locked = isLocked();
   document.getElementById('tbl-body').innerHTML = rows.map((r, i) => {
     const aid = r['ApiCallId'] || '';
-    const editBtn = aid
-      ? `<button onclick="openEditRow('${esc(aid)}')" title="עריכה" class="touch-btn text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded p-1 transition text-sm">✏️</button>`
-      : `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">✏️</button>`;
-    const delBtn = aid
-      ? `<button onclick="openDeleteRow('${esc(aid)}')" title="מחיקה" class="touch-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition text-sm">🗑️</button>`
-      : `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">🗑️</button>`;
+    let editBtn, delBtn;
+    if (locked) {
+      editBtn = `<button disabled title="עריכה נעולה" class="opacity-20 cursor-not-allowed p-1 text-sm">🔒</button>`;
+      delBtn  = `<button disabled title="עריכה נעולה" class="opacity-20 cursor-not-allowed p-1 text-sm">🔒</button>`;
+    } else if (aid) {
+      editBtn = `<button onclick="openEditRow('${esc(aid)}')" title="עריכה" class="touch-btn text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded p-1 transition text-sm">✏️</button>`;
+      delBtn  = `<button onclick="openDeleteRow('${esc(aid)}')" title="מחיקה" class="touch-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition text-sm">🗑️</button>`;
+    } else {
+      editBtn = `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">✏️</button>`;
+      delBtn  = `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">🗑️</button>`;
+    }
     return `<tr class="${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors">` +
       `<td class="px-2 py-2 border-b border-gray-100"><div class="flex gap-0.5 justify-center">${editBtn}${delBtn}</div></td>` +
       headers.map(h => `<td class="px-4 py-3 text-gray-700 border-b border-gray-100 whitespace-nowrap">${esc(r[h]||'')}</td>`).join('') +
@@ -530,7 +557,7 @@ async function doLoad() {
     setState('table');
     render();
     calcPivots();
-    document.getElementById('add-row-btn').classList.remove('hidden');
+    applyLockState();
     _updateNavSub();
     showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
     startAutoRefresh();
@@ -589,6 +616,7 @@ function applyPendingData() {
   document.getElementById('search').value = '';
   render();
   calcPivots();
+  applyLockState();
   _updateNavSub();
   showAlert('success', `עודכן ל-${allRows.length.toLocaleString()} רשומות ✅`);
 }
@@ -695,6 +723,8 @@ function openSettings() {
   if (headers.length) { buildColInputs(); buildPivotRows(); }
   document.getElementById('col-section').classList.toggle('hidden', !headers.length);
   document.getElementById('pivot-cfg-section').classList.toggle('hidden', !headers.length);
+  const tog = document.getElementById('crud-lock-toggle');
+  if (tog) tog.checked = isLocked();
   document.getElementById('modal').classList.remove('hidden');
 }
 
@@ -858,6 +888,7 @@ function readSettings() {
     fileName:     wizFile,
     columnLabels: labels,
     pivots:       readPivots(),
+    crudLocked:   !!document.getElementById('crud-lock-toggle')?.checked,
   };
 }
 
@@ -886,6 +917,39 @@ function buildColInputs() {
         data-col="${esc(h)}" value="${esc(labels[h]||'')}" placeholder="${esc(h)}">
     </div>`
   ).join('');
+}
+
+// ── Lock / unlock editing ──────────────────────────────────────────────
+function isLocked() { return cfg.crudLocked !== false; }
+
+function applyLockState() {
+  const locked = isLocked();
+  const btn    = document.getElementById('lock-btn');
+  const icon   = document.getElementById('lock-icon');
+  const lbl    = document.getElementById('lock-label');
+  if (btn) {
+    icon.textContent = locked ? '🔒' : '🔓';
+    lbl.textContent  = locked ? 'נעול' : 'פתוח לעריכה';
+    btn.className = `touch-btn text-sm px-3 py-2 rounded-lg gap-1 transition ${
+      locked ? 'bg-red-800 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'
+    }`;
+  }
+  // Show/hide add-row button
+  const addBtn = document.getElementById('add-row-btn');
+  if (addBtn) addBtn.classList.toggle('hidden', locked || !headers.length);
+  // Sync settings toggle if visible
+  const tog = document.getElementById('crud-lock-toggle');
+  if (tog) tog.checked = locked;
+  // Re-render table to update action buttons
+  if (allRows.length) renderTable();
+}
+
+function toggleCrudLock() {
+  cfg.crudLocked = !isLocked();
+  saveCfg();
+  applyLockState();
+  showAlert(isLocked() ? 'warning' : 'success',
+    isLocked() ? '🔒 עריכת נתונים ננעלה' : '🔓 עריכת נתונים פתוחה — היזהר בביצוע שינויים');
 }
 
 // ── CRUD helpers ──────────────────────────────────────────────────────
@@ -933,13 +997,23 @@ async function _callCrud(payload) {
   return r.json();
 }
 
+// ── Warning banner shown at top of every CRUD form ────────────────────
+const CRUD_WARNING = `<div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+  <span class="text-amber-500 text-lg flex-shrink-0">⚠️</span>
+  <div>
+    <p class="text-sm font-semibold text-amber-800">שים לב — שינוי בקובץ המקור!</p>
+    <p class="text-xs text-amber-700 mt-0.5">פעולה זו משנה את הקובץ המקורי בשרת ימות המשיח ועלולה לשבש נתונים שנאספו מהמרכזייה. ודא שאתה יודע מה אתה עושה.</p>
+  </div>
+</div>`;
+
 // ── Open Edit modal ────────────────────────────────────────────────────
 function openEditRow(apiCallId) {
+  if (isLocked()) { showAlert('warning', '🔒 עריכת נתונים נעולה — לחץ על כפתור הנעילה בראש העמוד כדי לפתוח'); return; }
   const row = allRows.find(r => r['ApiCallId'] === apiCallId);
   if (!row) { showAlert('error', 'שורה לא נמצאה'); return; }
 
   document.getElementById('crud-title').textContent = '✏️ עריכת שורה';
-  document.getElementById('crud-body').innerHTML =
+  document.getElementById('crud-body').innerHTML = CRUD_WARNING +
     headers.map(h => _crudField(h, row[h], CRUD_READONLY.includes(h))).join('');
   document.getElementById('crud-submit-area').innerHTML =
     `<button onclick="submitEdit('${esc(apiCallId)}')"
@@ -972,9 +1046,10 @@ async function submitEdit(apiCallId) {
 
 // ── Open Add modal ─────────────────────────────────────────────────────
 function openAddRow() {
+  if (isLocked()) { showAlert('warning', '🔒 עריכת נתונים נעולה — לחץ על כפתור הנעילה בראש העמוד כדי לפתוח'); return; }
   if (!headers.length) { showAlert('warning', 'טען נתונים תחילה'); return; }
   document.getElementById('crud-title').textContent = '➕ הוספת שורה חדשה';
-  document.getElementById('crud-body').innerHTML =
+  document.getElementById('crud-body').innerHTML = CRUD_WARNING +
     headers.filter(h => !CRUD_READONLY.includes(h))
            .map(h => _crudField(h, '', false)).join('');
   document.getElementById('crud-submit-area').innerHTML =
@@ -1003,6 +1078,7 @@ async function submitAdd() {
 
 // ── Open Delete confirmation ───────────────────────────────────────────
 function openDeleteRow(apiCallId) {
+  if (isLocked()) { showAlert('warning', '🔒 עריכת נתונים נעולה — לחץ על כפתור הנעילה בראש העמוד כדי לפתוח'); return; }
   const row = allRows.find(r => r['ApiCallId'] === apiCallId);
   if (!row) { showAlert('error', 'שורה לא נמצאה'); return; }
   pendingDeleteRow = row;
@@ -1150,6 +1226,10 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
 // ── Init ───────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  // Apply lock state immediately (before data loads) — default: locked
+  if (cfg.crudLocked === undefined) cfg.crudLocked = true;
+  applyLockState();
+
   // Load global config from server first (shared between all users)
   try {
     const r = await fetch('/api/config');
