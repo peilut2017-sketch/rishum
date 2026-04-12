@@ -3,35 +3,27 @@ const fetch = require('node-fetch');
 const API_BASE = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
-// Parse an HTML table returned by RenderYMGRFile?format=html
-// Extracts <tr>/<th>/<td> into { headers, rows }
+// Parse HTML table returned by RenderYMGRFile?format=html
 function parseHtmlTable(html) {
   const headers = [];
   const rows    = [];
-
-  // Pull all <tr> blocks
-  const trRe   = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-  const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-
+  const trRe    = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
   let trMatch;
+
   while ((trMatch = trRe.exec(html)) !== null) {
-    const cellBlock = trMatch[1];
     const cells = [];
-    let cellMatch;
-    const cellRe2 = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
-    while ((cellMatch = cellRe2.exec(cellBlock)) !== null) {
-      // Strip inner tags, decode basic HTML entities
-      const text = cellMatch[1]
-        .replace(/<[^>]+>/g, '')
-        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-        .replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
-        .trim();
-      cells.push(text);
+    const cellRe = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+    let cm;
+    while ((cm = cellRe.exec(trMatch[1])) !== null) {
+      let val = cm[1].replace(/<[^>]+>/g, '').trim()
+        .replace(/&amp;/g,  '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+      try { val = decodeURIComponent(val); } catch { /* keep as-is */ }
+      cells.push(val);
     }
     if (!cells.length) continue;
 
     if (!headers.length) {
-      // First row → headers
       headers.push(...cells);
     } else {
       const row = {};
@@ -39,7 +31,6 @@ function parseHtmlTable(html) {
       if (headers.some(h => row[h])) rows.push(row);
     }
   }
-
   return { headers, rows };
 }
 
@@ -50,33 +41,39 @@ module.exports = async (req, res) => {
   if (!token)     return res.json({ ok: false, message: 'נדרש מפתח API' });
   if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
-  const file = fileName || 'approvalall.ymgr';
-  const ext  = String(extension).replace(/^\//, '');
-  const what = `ivr2:/${ext}/${file}`;
+  const file = (fileName || 'ApprovalAll.ymgr').trim();
+  const ext  = String(extension).replace(/^\/+/, ''); // strip any leading slashes
+  const what = `ivr2:${ext}/${file}`;                 // e.g. ivr2:5/ApprovalAll.ymgr
 
-  // RenderYMGRFile with format=html returns a readable HTML table
+  // Note: the API parameter has a server-side typo — 'wath' not 'what'
   const url = `${API_BASE}/RenderYMGRFile?wath=${enc(what)}&format=html&token=${enc(token)}`;
 
   try {
     const r    = await fetch(url, { headers: { authorization: token } });
-    const html = await r.text();
+    const text = await r.text();
 
-    if (!html || !html.trim()) {
+    if (!text || !text.trim()) {
       return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
     }
 
-    if (!html.includes('<') ) {
-      // Not HTML — unexpected plain text
-      return res.json({ ok: false, message: 'פורמט לא צפוי מהשרת', rawPreview: html.slice(0, 400) });
+    // If response is not HTML — may be a JSON error from the API
+    if (!text.trimStart().startsWith('<')) {
+      try {
+        const json = JSON.parse(text);
+        if (json.responseStatus && json.responseStatus !== 'OK') {
+          return res.json({ ok: false, message: json.message || json.responseStatus });
+        }
+      } catch { /* not JSON */ }
+      return res.json({ ok: false, message: 'פורמט לא צפוי מהשרת', rawPreview: text.slice(0, 300) });
     }
 
-    const parsed = parseHtmlTable(html);
+    const { headers, rows } = parseHtmlTable(text);
 
-    if (!parsed.rows.length) {
-      return res.json({ ok: false, message: 'הקובץ נמצא אך לא נמצאו שורות נתונים', rawPreview: html.slice(0, 500) });
+    if (!rows.length) {
+      return res.json({ ok: false, message: 'לא נמצאו שורות נתונים', rawPreview: text.slice(0, 400) });
     }
 
-    res.json({ ok: true, ...parsed });
+    res.json({ ok: true, headers, rows });
 
   } catch (e) {
     res.status(502).json({ ok: false, message: e.message });

@@ -4,12 +4,12 @@ const API_BASE = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
 const COMMON_FILES = [
-  'approvalall.ymgr', 'ApprovalAll.ymgr', 'approval_all.ymgr',
-  'ALL.YMGR', 'All.ymgr', 'DATA.YMGR', 'data.ymgr', 'FORMDATA.YMGR',
+  'ApprovalAll.ymgr', 'approvalall.ymgr', 'approval_all.ymgr',
+  'All.ymgr', 'data.ymgr', 'FormData.ymgr',
 ];
 
 async function tryFile(token, ext, fileName) {
-  const what = `ivr2:/${ext}/${fileName}`;
+  const what = `ivr2:${ext}/${fileName}`;   // no leading slash: ivr2:EXT/FILE
   const url  = `${API_BASE}/RenderYMGRFile?wath=${enc(what)}&format=html&token=${enc(token)}`;
   try {
     const r    = await Promise.race([
@@ -32,7 +32,7 @@ async function tryFile(token, ext, fileName) {
       headers.push(m[1].replace(/<[^>]+>/g, '').trim());
     }
 
-    return { found: true, path: `ivr2:/${ext}/${fileName}`, fileName, headers, rowCount };
+    return { found: true, path: `ivr2:${ext}/${fileName}`, fileName, headers, rowCount };
   } catch(e) {
     return { found: false, fileName, preview: e.message };
   }
