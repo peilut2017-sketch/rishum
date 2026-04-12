@@ -1,82 +1,70 @@
 const fetch = require('node-fetch');
 
-const DL_URL  = 'https://www.call2all.co.il/ym/dl.php';
-const API_URL = 'https://www.call2all.co.il/ym/api';
+const API_BASE = 'https://www.call2all.co.il/ymot/api';
 const enc = encodeURIComponent;
 
-// Accept any of these input formats and return the "what" value:
-//   https://...dl.php?what=ivr2:2/1/Foo.ini  → ivr2:2/1/Foo.ini
-//   ivr2:2/1/Foo.ini                          → ivr2:2/1/Foo.ini
-//   /2/1/1  or  2/1/1                         → ivr2:2/1/1
-function toWhat(tablePath) {
-  const s = (tablePath || '').trim();
-  if (s.includes('dl.php')) {
-    try {
-      const u = new URL(s.startsWith('http') ? s : 'https://www.call2all.co.il' + s);
-      const w = u.searchParams.get('what');
-      if (w) return w;
-    } catch {}
-  }
-  if (s.startsWith('ivr2:')) return s;
-  const plain = s.startsWith('/') ? s.slice(1) : s;
-  return `ivr2:${plain}`;
-}
+// Parse INI/CSV content from ימות המשיח into { headers, rows }
+function parseIniContent(text) {
+  if (!text || !text.trim()) return { headers: [], rows: [] };
+  const raw = text.trim();
 
-async function tryFetch(url) {
-  try {
-    const r = await fetch(url);
-    const text = await r.text();
-    if (!text || !text.trim()) return null;
-    return text.trim();
-  } catch {
-    return null;
-  }
-}
+  // Detect separator: pipe | or comma ,
+  const firstLine = raw.split(/\r?\n/)[0];
+  const sep = firstLine.includes('|') ? '|' : ',';
 
-function parseText(text) {
-  if (!text) return null;
-  // JSON
-  try {
-    const j = JSON.parse(text);
-    if (j.responseStatus === 'ERROR' || j.responseStatus === 'NOT_AUTHENTICATED') return { error: j.message || j.responseStatus };
-    if (typeof j.table === 'string') return { format: 'csv', data: j.table };
-    return { format: 'json', data: j };
-  } catch {}
-  // Looks like an error string (no comma = not CSV)
-  if (!text.includes(',') && /invalid|error|not.?found|denied|forbidden/i.test(text)) {
-    return { error: text.slice(0, 300) };
-  }
-  // Treat as CSV/INI
-  return { format: 'csv', data: text };
+  const lines = raw.split(/\r?\n/).filter(l => l.trim() && !l.startsWith(';') && !l.startsWith('#'));
+  if (!lines.length) return { headers: [], rows: [] };
+
+  const headers = lines[0].split(sep).map(h => h.replace(/"/g, '').trim());
+  const rows = lines.slice(1).map(line => {
+    const vals = line.split(sep).map(v => v.replace(/"/g, '').trim());
+    const row = {};
+    headers.forEach((h, i) => { row[h] = vals[i] ?? ''; });
+    return row;
+  }).filter(r => headers.some(h => r[h]));
+
+  return { headers, rows };
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { token, tablePath, apiBase } = req.body;
-  const what = toWhat(tablePath);
-  const base = (apiBase || API_URL).replace(/\/$/, '');
+  const { token, extension, fileName } = req.body;
 
-  // Try in order: session-token auth, apiKey param, no-auth (in case public)
-  const urls = [
-    `${DL_URL}?token=${enc(token)}&what=${enc(what)}`,
-    `${DL_URL}?apiKey=${enc(token)}&what=${enc(what)}`,
-    `${DL_URL}?key=${enc(token)}&what=${enc(what)}`,
-    // Legacy API endpoints
-    `${base}/GetIvrTables?token=${enc(token)}&path=${enc(what)}`,
-    `${base}/GetTextFile?token=${enc(token)}&path=${enc(what)}`,
-  ];
+  if (!token)     return res.json({ ok: false, message: 'נדרש מפתח API' });
+  if (!extension) return res.json({ ok: false, message: 'נדרש מספר שלוחה' });
 
-  let lastError = 'לא התקבלה תגובה מהשרת';
+  const file = fileName || 'ApprovalAll.ini';
+  const ext  = String(extension).replace(/^\//, ''); // strip leading slash
+  const path = `ivr2:${ext}/${file}`;
+  const url  = `${API_BASE}/GetTextFile?token=${enc(token)}&path=${enc(path)}`;
 
-  for (const url of urls) {
-    const text = await tryFetch(url);
-    if (!text) continue;
-    const parsed = parseText(text);
-    if (!parsed) continue;
-    if (parsed.error) { lastError = parsed.error; continue; }
-    return res.json({ ok: true, format: parsed.format, data: parsed.data });
+  try {
+    const r = await fetch(url);
+
+    // ימות המשיח returns JSON with responseStatus + file content
+    let json;
+    try {
+      json = await r.json();
+    } catch {
+      return res.json({ ok: false, message: 'תגובה לא תקינה מהשרת' });
+    }
+
+    if (json.responseStatus !== 'OK') {
+      return res.json({ ok: false, message: json.message || json.responseStatus || 'שגיאת API' });
+    }
+
+    // File content may be in different fields depending on API version
+    const content = json.file ?? json.content ?? json.data ?? json.text ?? '';
+
+    if (!content || !content.trim()) {
+      return res.json({ ok: false, message: `הקובץ ${file} ריק או לא קיים בשלוחה ${ext}` });
+    }
+
+    const parsed = parseIniContent(content);
+    res.json({ ok: true, ...parsed, raw: content });
+
+  } catch (e) {
+    res.status(502).json({ ok: false, message: e.message });
   }
-
-  res.json({ ok: false, message: `שגיאת API: ${lastError}` });
 };
