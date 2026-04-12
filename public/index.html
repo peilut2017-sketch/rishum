@@ -268,18 +268,21 @@ function saveCfg() { localStorage.setItem('ym_cfg', JSON.stringify(cfg)); }
 
 // ── API ────────────────────────────────────────────────────────────────
 async function getToken() {
-  const body = cfg.authType === 'apikey'
-    ? { apiKey: cfg.apiKey, apiBase: cfg.apiBase }
-    : { username: cfg.username, password: cfg.password, apiBase: cfg.apiBase };
-
+  // API key is used directly as the token with dl.php — no Login needed
+  if (cfg.authType === 'apikey') {
+    if (!cfg.apiKey) throw new Error('מפתח API לא הוגדר');
+    token = cfg.apiKey;
+    return;
+  }
+  // Username + password → get session token via Login
   const r = await fetch('/api/login', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify(body)
+    body: JSON.stringify({ username: cfg.username, password: cfg.password, apiBase: cfg.apiBase })
   });
   const d = await r.json();
   if (d.responseStatus !== 'OK' || !d.token) {
-    throw new Error(d.message || 'שגיאת כניסה — בדוק מפתח API / שם משתמש וסיסמה');
+    throw new Error(d.message || 'שגיאת כניסה — בדוק שם משתמש וסיסמה');
   }
   token = d.token;
 }

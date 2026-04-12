@@ -6,21 +6,12 @@ const enc = encodeURIComponent;
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const { username, password, apiKey, apiBase } = req.body;
+  // API key auth: token is used directly with dl.php — no Login call needed
+  const { username, password, apiBase } = req.body;
   const base = (apiBase || DEFAULT_BASE).replace(/\/$/, '');
 
   try {
-    let url;
-
-    if (apiKey) {
-      // Fixed API key → exchange for session token via Login
-      // ימות המשיח accepts apiKey as a login parameter
-      url = `${base}/Login?apiKey=${enc(apiKey)}`;
-    } else {
-      url = `${base}/Login?username=${enc(username)}&password=${enc(password)}`;
-    }
-
-    const r = await fetch(url);
+    const r = await fetch(`${base}/Login?username=${enc(username)}&password=${enc(password)}`);
     const json = await r.json();
     res.json(json);
   } catch (e) {
