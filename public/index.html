@@ -14,26 +14,34 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .fade-in { animation: fadeIn .25s ease; }
     @keyframes fadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
+    .slide-down { animation: slideDown .3s ease; }
+    @keyframes slideDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
     th.sortable:hover { background:#e5e7eb; cursor:pointer; }
+    /* Mobile table: tighter cells */
+    @media (max-width: 640px) {
+      #tbl-head th, #tbl-body td { padding: 8px 10px; font-size: 0.72rem; }
+    }
+    /* Ensure minimum touch-target size */
+    .touch-btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
 
 <!-- ═══ HEADER ═══════════════════════════════════════════════════════ -->
 <header class="bg-blue-900 text-white shadow-lg">
-  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-    <div>
-      <h1 class="text-xl font-bold">📞 מערכת ניהול – ימות המשיח</h1>
-      <p class="text-blue-300 text-xs mt-0.5" id="nav-sub">לחץ "טען נתונים" להתחיל</p>
+  <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
+    <div class="min-w-0 flex-1">
+      <h1 class="text-base sm:text-xl font-bold leading-tight truncate">📞 מערכת ניהול – ימות המשיח</h1>
+      <p class="text-blue-300 text-xs mt-0.5 truncate" id="nav-sub">לחץ "טען נתונים" להתחיל</p>
     </div>
-    <div class="flex gap-2">
+    <div class="flex gap-2 flex-shrink-0">
       <button onclick="doRefresh()"
-        class="bg-blue-700 hover:bg-blue-600 text-white text-sm px-3 py-2 rounded-lg flex items-center gap-1 transition">
-        🔄 רענן
+        class="touch-btn bg-blue-700 hover:bg-blue-600 text-white text-sm px-3 py-2 rounded-lg gap-1 transition">
+        <span>🔄</span><span class="hidden sm:inline">רענן</span>
       </button>
       <button onclick="openSettings()"
-        class="bg-white text-blue-900 hover:bg-blue-50 text-sm font-semibold px-3 py-2 rounded-lg flex items-center gap-1 transition">
-        ⚙️ הגדרות
+        class="touch-btn bg-white text-blue-900 hover:bg-blue-50 text-sm font-semibold px-3 py-2 rounded-lg gap-1 transition">
+        <span>⚙️</span><span class="hidden sm:inline">הגדרות</span>
       </button>
     </div>
   </div>
@@ -44,6 +52,18 @@
 
   <!-- Alert -->
   <div id="alert" class="hidden fade-in"></div>
+
+  <!-- New rows notification banner -->
+  <div id="new-rows-banner" class="hidden slide-down bg-blue-600 text-white px-4 py-3 rounded-xl flex items-center justify-between gap-3">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="text-lg flex-shrink-0">🔔</span>
+      <span class="text-sm">יש <strong id="new-rows-count">0</strong> שורות חדשות מאז הטעינה האחרונה</span>
+    </div>
+    <button onclick="applyPendingData()"
+      class="touch-btn flex-shrink-0 bg-white text-blue-600 text-sm font-bold px-4 py-1.5 rounded-lg hover:bg-blue-50 transition whitespace-nowrap">
+      רענן עכשיו
+    </button>
+  </div>
 
   <!-- Stats Cards -->
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -66,21 +86,23 @@
   </div>
 
   <!-- Controls -->
-  <div class="bg-white rounded-xl shadow-sm p-3 flex flex-wrap items-center gap-3">
+  <div class="bg-white rounded-xl shadow-sm p-3 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
     <input id="search" type="text" placeholder="🔍 חיפוש בכל השדות..."
       oninput="onSearch(this.value)"
-      class="flex-1 min-w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-    <select id="page-size" onchange="onPageSize(this.value)"
-      class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-      <option value="25">25 שורות</option>
-      <option value="50">50 שורות</option>
-      <option value="100">100 שורות</option>
-      <option value="0">הכל</option>
-    </select>
-    <button onclick="doExport()"
-      class="bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg flex items-center gap-1 transition">
-      ⬇️ ייצוא CSV
-    </button>
+      class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+    <div class="flex gap-2">
+      <select id="page-size" onchange="onPageSize(this.value)"
+        class="flex-1 sm:flex-none touch-btn border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+        <option value="25">25 שורות</option>
+        <option value="50">50 שורות</option>
+        <option value="100">100 שורות</option>
+        <option value="0">הכל</option>
+      </select>
+      <button onclick="doExport()"
+        class="flex-1 sm:flex-none touch-btn bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg gap-1 transition">
+        ⬇️ <span class="hidden sm:inline">ייצוא</span> CSV
+      </button>
+    </div>
     <span id="rec-count" class="text-xs text-gray-500"></span>
   </div>
 
@@ -254,6 +276,11 @@ let sortDir = 'asc';
 let page = 1;
 let perPage = 25;
 let search = '';
+// Auto-refresh
+let pendingNewRows = null;
+let pendingNewData = null;
+let autoRefreshTimer = null;
+const AUTO_REFRESH_MS = 60000; // check every 60 seconds
 
 // ── Config (localStorage) ──────────────────────────────────────────────
 function loadCfg() {
@@ -375,12 +402,12 @@ function renderPagination() {
 
   const range = pageRange(page, totalPages);
   document.getElementById('page-btns').innerHTML =
-    `<button onclick="goPage(${page-1})" ${page===1?'disabled':''} class="px-3 py-1.5 rounded border text-sm ${page===1?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">‹</button>` +
+    `<button onclick="goPage(${page-1})" ${page===1?'disabled':''} class="touch-btn min-w-[44px] px-3 rounded border text-sm ${page===1?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">‹</button>` +
     range.map(p => p==='…'
-      ? `<span class="px-2 text-gray-400">…</span>`
-      : `<button onclick="goPage(${p})" class="min-w-[36px] h-8 px-2 rounded border text-sm ${p===page?'bg-blue-600 text-white border-blue-600 font-medium':'hover:bg-gray-50'}">${p}</button>`
+      ? `<span class="px-2 text-gray-400 self-center">…</span>`
+      : `<button onclick="goPage(${p})" class="touch-btn min-w-[44px] px-2 rounded border text-sm ${p===page?'bg-blue-600 text-white border-blue-600 font-medium':'hover:bg-gray-50'}">${p}</button>`
     ).join('') +
-    `<button onclick="goPage(${page+1})" ${page===totalPages?'disabled':''} class="px-3 py-1.5 rounded border text-sm ${page===totalPages?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">›</button>`;
+    `<button onclick="goPage(${page+1})" ${page===totalPages?'disabled':''} class="touch-btn min-w-[44px] px-3 rounded border text-sm ${page===totalPages?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">›</button>`;
 }
 
 function pageRange(cur, tot) {
@@ -424,6 +451,10 @@ function doExport() {
 
 // ── Main load ──────────────────────────────────────────────────────────
 async function doLoad() {
+  stopAutoRefresh();
+  hideBanner();
+  pendingNewRows = null;
+  pendingNewData = null;
   setState('loading');
   clearAlert();
   try {
@@ -435,17 +466,71 @@ async function doLoad() {
     document.getElementById('search').value='';
     setState('table');
     render();
-    const file = cfg.fileName || 'ApprovalAll.ymgr';
-    document.getElementById('nav-sub').textContent =
-      `ivr2:${cfg.extension}/${file} · ${allRows.length.toLocaleString()} רשומות`;
+    _updateNavSub();
     showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
+    startAutoRefresh();
   } catch(e) {
     setState('empty');
     showAlert('error', e.message);
   }
 }
 
-async function doRefresh() { await doLoad(); }
+async function doRefresh() {
+  hideBanner();
+  pendingNewRows = null;
+  pendingNewData = null;
+  await doLoad();
+}
+
+// ── Auto-refresh (silent background check) ────────────────────────────
+function startAutoRefresh() {
+  stopAutoRefresh();
+  autoRefreshTimer = setInterval(silentCheck, AUTO_REFRESH_MS);
+}
+
+function stopAutoRefresh() {
+  if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
+}
+
+async function silentCheck() {
+  if (!cfg.apiKey || !cfg.extension || !allRows.length) return;
+  try {
+    const d = await fetchData();
+    const diff = d.rows.length - allRows.length;
+    if (diff > 0) {
+      pendingNewData = d;
+      pendingNewRows = diff;
+      document.getElementById('new-rows-count').textContent = diff.toLocaleString();
+      document.getElementById('new-rows-banner').classList.remove('hidden');
+    }
+  } catch {} // silent — never disrupt user with background errors
+}
+
+function hideBanner() {
+  document.getElementById('new-rows-banner').classList.add('hidden');
+}
+
+function applyPendingData() {
+  if (!pendingNewData) return;
+  const d = pendingNewData;
+  pendingNewData = null;
+  pendingNewRows = null;
+  hideBanner();
+  headers = d.headers;
+  allRows = d.rows;
+  calcStats();
+  search = ''; page = 1;
+  document.getElementById('search').value = '';
+  render();
+  _updateNavSub();
+  showAlert('success', `עודכן ל-${allRows.length.toLocaleString()} רשומות ✅`);
+}
+
+function _updateNavSub() {
+  const file = cfg.fileName || 'ApprovalAll.ymgr';
+  document.getElementById('nav-sub').textContent =
+    `ivr2:${cfg.extension}/${file} · ${allRows.length.toLocaleString()} רשומות`;
+}
 
 // ── File browser ───────────────────────────────────────────────────────
 async function doSearchFiles() {
@@ -710,6 +795,14 @@ function readSettings() {
 async function doSaveLoad() {
   cfg = readSettings();
   saveCfg();
+  // Save to server so all users share these settings
+  try {
+    await fetch('/api/config', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ apiKey: cfg.apiKey, extension: cfg.extension, fileName: cfg.fileName })
+    });
+  } catch {} // silent — local save already done
   closeSettings();
   await doLoad();
 }
@@ -748,7 +841,23 @@ function clearAlert() { document.getElementById('alert').classList.add('hidden')
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ── Init ───────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
+  // Load global config from server first (shared between all users)
+  try {
+    const r = await fetch('/api/config');
+    const d = await r.json();
+    if (d.ok && d.config && d.config.apiKey) {
+      // Server config takes precedence for connection settings
+      cfg = {
+        ...cfg,
+        apiKey:    d.config.apiKey    || cfg.apiKey,
+        extension: d.config.extension || cfg.extension,
+        fileName:  d.config.fileName  || cfg.fileName,
+      };
+      saveCfg(); // update local cache
+    }
+  } catch {} // if server unreachable, fall back to local localStorage
+
   if (cfg.apiKey && cfg.extension && cfg.fileName) doLoad();
 });
 </script>
