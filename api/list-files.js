@@ -9,7 +9,7 @@ const COMMON_FILES = [
 
 async function tryFile(token, ext, fileName) {
   const what = `ivr2:${ext}/${fileName}`;
-  const body = new URLSearchParams({ wath: what, format: 'html', token });
+  const body = new URLSearchParams({ wath: what, convertType: 'json', token });
   try {
     const r = await Promise.race([
       fetch(`${API_BASE}/RenderYMGRFile`, {
@@ -19,21 +19,27 @@ async function tryFile(token, ext, fileName) {
       }),
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 7000))
     ]);
-    const html = await r.text();
-    const preview = (html || '').slice(0, 200);
+    const text = await r.text();
+    if (!text || !text.trim()) return { found: false, fileName, preview: '(empty)' };
 
-    if (!html || !html.trim())  return { found: false, fileName, preview: '(empty)' };
-    if (!html.includes('<td'))  return { found: false, fileName, preview };
-
-    const rowCount = (html.match(/<tr[^>]*>/gi) || []).length - 1;
-    if (rowCount < 1) return { found: false, fileName, preview };
-
-    const headers = [];
-    const thRe = /<th[^>]*>([\s\S]*?)<\/th>/gi;
-    let m;
-    while ((m = thRe.exec(html)) !== null) {
-      headers.push(m[1].replace(/<[^>]+>/g, '').trim());
+    let json;
+    try { json = JSON.parse(text); } catch {
+      return { found: false, fileName, preview: text.slice(0, 150) };
     }
+
+    if (json.responseStatus && json.responseStatus !== 'OK') {
+      return { found: false, fileName, preview: json.message || json.responseStatus };
+    }
+
+    // Extract headers and row count from JSON
+    const data = json.rows || json.data || (Array.isArray(json) ? json : null);
+    if (!data || !data.length) return { found: false, fileName, preview: 'empty data' };
+
+    const rowCount = data.length;
+    const firstRow = Array.isArray(data[0]) ? null : data[0];
+    const headers  = json.headers
+      ? json.headers.map(h => { try { return decodeURIComponent(h); } catch { return h; } })
+      : firstRow ? Object.keys(firstRow) : [];
 
     return { found: true, path: `ivr2:${ext}/${fileName}`, fileName, headers, rowCount };
   } catch(e) {
