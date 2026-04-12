@@ -122,87 +122,102 @@
 
 </main>
 
-<!-- ═══ SETTINGS MODAL ════════════════════════════════════════════════ -->
+<!-- ═══ SETTINGS MODAL (3-step wizard) ══════════════════════════════ -->
 <div id="modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-y-auto fade-in" style="max-height:90vh">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg fade-in flex flex-col" style="max-height:90vh">
 
-    <!-- Modal header -->
-    <div class="bg-blue-900 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between">
+    <!-- Header -->
+    <div class="bg-blue-900 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
       <h2 class="font-bold text-lg">⚙️ הגדרות חיבור</h2>
       <button onclick="closeSettings()" class="text-blue-200 hover:text-white text-2xl leading-none">✕</button>
     </div>
 
-    <div class="p-6 space-y-5">
+    <!-- Step indicators -->
+    <div class="flex items-center justify-center gap-3 py-4 border-b flex-shrink-0 bg-gray-50">
+      <div id="ind-1" class="flex items-center gap-1.5">
+        <div id="ind-1-num" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-blue-600 text-white">1</div>
+        <span id="ind-1-lbl" class="text-xs font-medium text-blue-700">מפתח API</span>
+      </div>
+      <div class="w-10 h-px bg-gray-300"></div>
+      <div id="ind-2" class="flex items-center gap-1.5">
+        <div id="ind-2-num" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400">2</div>
+        <span id="ind-2-lbl" class="text-xs text-gray-400">שלוחה וקובץ</span>
+      </div>
+      <div class="w-10 h-px bg-gray-300"></div>
+      <div id="ind-3" class="flex items-center gap-1.5">
+        <div id="ind-3-num" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400">3</div>
+        <span id="ind-3-lbl" class="text-xs text-gray-400">אישור</span>
+      </div>
+    </div>
 
-      <!-- Token -->
-      <div>
+    <!-- Step content (scrollable) -->
+    <div class="overflow-y-auto flex-1 p-6">
+
+      <!-- ── Step 1: Token ── -->
+      <div id="wiz-step-1">
+        <p class="text-sm text-gray-500 mb-5">הכנס את מפתח ה-API של מערכת ימות המשיח שלך ובדוק חיבור</p>
         <label class="block text-sm font-semibold text-gray-700 mb-1">🔑 מפתח API (Token)</label>
-        <input id="m-apikey" type="text" placeholder="הכנס את מפתח ה-API של המערכת"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-        <p class="text-xs text-gray-400 mt-1">מפתח ייחודי לכל מערכת ימות המשיח</p>
+        <input id="m-apikey" type="text" placeholder="הדבק כאן את מפתח ה-API"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 mb-3">
+        <button onclick="doTestToken()" id="test-token-btn"
+          class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2 rounded-lg transition">
+          🔗 בדוק חיבור
+        </button>
+        <div id="token-status" class="mt-3 text-sm"></div>
       </div>
 
-      <!-- Extension number -->
-      <div>
+      <!-- ── Step 2: Extension + Files ── -->
+      <div id="wiz-step-2" class="hidden">
+        <p class="text-sm text-gray-500 mb-5">הכנס מספר שלוחה וחפש את הקבצים הזמינים בה</p>
         <label class="block text-sm font-semibold text-gray-700 mb-1">📞 מספר שלוחה</label>
-        <div class="flex gap-2">
+        <div class="flex gap-2 mb-1">
           <input id="m-ext" type="text" placeholder="לדוגמה: 5  או  2/1"
-            oninput="updatePathPreview()"
             class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-          <button id="search-files-btn" onclick="doSearchFiles()" type="button"
-            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-lg transition flex items-center gap-1">
+          <button onclick="doSearchFiles()" id="search-files-btn"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-lg transition flex items-center gap-1 whitespace-nowrap">
             <span id="search-files-icon">🔍</span>
             <span id="search-files-label">חפש קבצים</span>
           </button>
         </div>
-        <!-- Dynamic path preview -->
-        <p class="text-xs text-gray-400 mt-1">
-          נתיב שייווצר: <code id="path-preview" class="text-blue-600">ivr2:__/approval_all.ymgr</code>
-        </p>
-
-        <!-- Found files list -->
-        <div id="files-found" class="hidden mt-3">
-          <p class="text-xs font-semibold text-gray-500 mb-2">קבצים שנמצאו – לחץ לבחירה:</p>
+        <div id="files-found" class="hidden mt-4">
+          <p class="text-xs font-semibold text-gray-500 mb-2">קבצים שנמצאו — לחץ לבחירה:</p>
           <div id="files-list" class="space-y-2 max-h-56 overflow-y-auto"></div>
         </div>
       </div>
 
-      <!-- Advanced: custom filename -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">
-          שם קובץ
-          <span class="text-gray-400 text-xs font-normal">(ברירת מחדל: approval_all.ymgr)</span>
-        </label>
-        <input id="m-filename" type="text" placeholder="approval_all.ymgr"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-      </div>
-
-      <!-- Column labels (shown only after data loads) -->
-      <div id="col-section" class="hidden">
-        <p class="text-sm font-semibold text-gray-700 mb-2">שמות עמודות לתצוגה</p>
-        <p class="text-xs text-gray-400 mb-3">השם המקורי מהקובץ מוצג משמאל. ניתן לשנות את שם התצוגה.</p>
-        <div id="col-inputs" class="space-y-2 max-h-52 overflow-y-auto pr-1"></div>
-      </div>
-
-      <!-- Test -->
-      <div class="flex items-center gap-3 pt-1">
-        <button id="test-btn" onclick="doTest()"
-          class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-4 py-2 rounded-lg transition">
-          🔗 בדוק חיבור
-        </button>
-        <span id="test-res" class="text-sm"></span>
+      <!-- ── Step 3: Confirm ── -->
+      <div id="wiz-step-3" class="hidden">
+        <p class="text-sm text-gray-500 mb-5">אשר את פרטי החיבור ולחץ "שמור וטען"</p>
+        <div class="space-y-2 mb-5">
+          <div class="bg-gray-50 rounded-lg px-4 py-3 flex justify-between items-center">
+            <span class="text-xs text-gray-500">מפתח API</span>
+            <span id="confirm-token" class="text-sm font-mono text-gray-700 max-w-xs truncate"></span>
+          </div>
+          <div class="bg-gray-50 rounded-lg px-4 py-3 flex justify-between items-center">
+            <span class="text-xs text-gray-500">שלוחה</span>
+            <span id="confirm-ext" class="text-sm font-semibold text-blue-700"></span>
+          </div>
+          <div class="bg-gray-50 rounded-lg px-4 py-3 flex justify-between items-center">
+            <span class="text-xs text-gray-500">קובץ</span>
+            <span id="confirm-file" class="text-sm font-mono font-semibold text-blue-700"></span>
+          </div>
+          <div class="bg-blue-50 rounded-lg px-4 py-3 flex justify-between items-center">
+            <span class="text-xs text-gray-500">נתיב מלא</span>
+            <code id="confirm-path" class="text-xs text-blue-700 font-bold"></code>
+          </div>
+        </div>
+        <!-- Column labels (shown after data already loaded) -->
+        <div id="col-section" class="hidden border-t pt-4">
+          <p class="text-sm font-semibold text-gray-700 mb-1">שמות עמודות לתצוגה</p>
+          <p class="text-xs text-gray-400 mb-3">ניתן לשנות את שם התצוגה לכל עמודה.</p>
+          <div id="col-inputs" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+        </div>
       </div>
 
     </div>
 
-    <!-- Modal footer -->
-    <div class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t flex justify-between items-center">
-      <button onclick="closeSettings()" class="text-sm text-gray-500 hover:text-gray-700">ביטול</button>
-      <button onclick="doSaveLoad()"
-        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2 rounded-lg transition">
-        שמור וטען נתונים
-      </button>
-    </div>
+    <!-- Footer (dynamic) -->
+    <div id="modal-footer" class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t flex-shrink-0"></div>
 
   </div>
 </div>
@@ -466,38 +481,196 @@ async function doSearchFiles() {
   label.textContent = 'חפש קבצים';
 }
 
+// ── Wizard state ───────────────────────────────────────────────────────
+let wizStep  = 1;
+let wizToken = '';
+let wizExt   = '';
+let wizFile  = '';
+
+// ── Wizard navigation ──────────────────────────────────────────────────
+function openSettings() {
+  wizToken = cfg.apiKey    || '';
+  wizExt   = cfg.extension || '';
+  wizFile  = cfg.fileName  || '';
+
+  document.getElementById('m-apikey').value = wizToken;
+  document.getElementById('m-ext').value    = wizExt;
+  document.getElementById('token-status').textContent = '';
+  document.getElementById('files-found').classList.add('hidden');
+
+  // If already fully configured, jump straight to confirm step
+  const startStep = (wizToken && wizExt && wizFile) ? 3 : 1;
+  if (startStep === 3) _populateConfirmStep();
+  goStep(startStep);
+
+  if (headers.length) buildColInputs();
+  document.getElementById('col-section').classList.toggle('hidden', !headers.length);
+  document.getElementById('modal').classList.remove('hidden');
+}
+
+function closeSettings() { document.getElementById('modal').classList.add('hidden'); }
+
+function goStep(n) {
+  wizStep = n;
+  [1, 2, 3].forEach(i => {
+    document.getElementById(`wiz-step-${i}`).classList.toggle('hidden', i !== n);
+  });
+  _updateIndicators();
+  _renderFooter();
+}
+
+function _updateIndicators() {
+  [1, 2, 3].forEach(i => {
+    const numEl = document.getElementById(`ind-${i}-num`);
+    const lblEl = document.getElementById(`ind-${i}-lbl`);
+    if (i < wizStep) {
+      numEl.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-green-500 text-white';
+      numEl.textContent = '✓';
+      lblEl.className = 'text-xs text-green-600 font-medium';
+    } else if (i === wizStep) {
+      numEl.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-blue-600 text-white';
+      numEl.textContent = String(i);
+      lblEl.className = 'text-xs font-medium text-blue-700';
+    } else {
+      numEl.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400';
+      numEl.textContent = String(i);
+      lblEl.className = 'text-xs text-gray-400';
+    }
+  });
+}
+
+function _renderFooter() {
+  const f = document.getElementById('modal-footer');
+  const backBtn = (label, step) =>
+    `<button onclick="goStep(${step})" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">← ${label}</button>`;
+  const nextBtn = (label, fn, disabled = false) =>
+    `<button onclick="${fn}()" id="wiz-next" ${disabled ? 'disabled' : ''}
+      class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
+      ${label} →</button>`;
+
+  if (wizStep === 1) {
+    f.innerHTML = `<div class="flex justify-between items-center">
+      <button onclick="closeSettings()" class="text-sm text-gray-500 hover:text-gray-700">ביטול</button>
+      ${nextBtn('הבא', 'wizNext1', !wizToken)}
+    </div>`;
+  } else if (wizStep === 2) {
+    f.innerHTML = `<div class="flex justify-between items-center">
+      ${backBtn('חזור', 1)}
+      ${nextBtn('הבא', 'wizNext2', !wizFile)}
+    </div>`;
+  } else {
+    f.innerHTML = `<div class="flex justify-between items-center">
+      ${backBtn('חזור', 2)}
+      <button onclick="doSaveLoad()"
+        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2 rounded-lg transition">
+        שמור וטען נתונים
+      </button>
+    </div>`;
+  }
+}
+
+function wizNext1() {
+  wizToken = document.getElementById('m-apikey').value.trim();
+  if (!wizToken) return;
+  goStep(2);
+}
+
+function wizNext2() {
+  wizExt = document.getElementById('m-ext').value.trim();
+  if (!wizFile || !wizExt) return;
+  _populateConfirmStep();
+  goStep(3);
+}
+
+function _populateConfirmStep() {
+  const masked = wizToken.length > 12
+    ? wizToken.slice(0, 6) + '…' + wizToken.slice(-4)
+    : wizToken;
+  document.getElementById('confirm-token').textContent = masked;
+  document.getElementById('confirm-ext').textContent   = wizExt;
+  document.getElementById('confirm-file').textContent  = wizFile;
+  document.getElementById('confirm-path').textContent  = `ivr2:${wizExt}/${wizFile}`;
+}
+
+// ── Step 1: Test token ─────────────────────────────────────────────────
+async function doTestToken() {
+  const btn    = document.getElementById('test-token-btn');
+  const status = document.getElementById('token-status');
+  const key    = document.getElementById('m-apikey').value.trim();
+
+  if (!key) {
+    status.textContent = '⚠️ הכנס מפתח API קודם';
+    status.className = 'mt-3 text-sm text-amber-600';
+    return;
+  }
+
+  btn.disabled = true;
+  status.innerHTML = '<span class="text-gray-400">בודק חיבור...</span>';
+
+  try {
+    const r = await fetch('/api/test-token', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ token: key })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      status.innerHTML = '✅ <strong>חיבור הצליח!</strong> מפתח ה-API תקין';
+      status.className = 'mt-3 text-sm text-green-600';
+      wizToken = key;
+      // Enable the "next" button
+      const nxt = document.getElementById('wiz-next');
+      if (nxt) nxt.disabled = false;
+    } else {
+      status.textContent = '❌ ' + (d.message || 'שגיאת חיבור');
+      status.className = 'mt-3 text-sm text-red-600';
+      wizToken = '';
+    }
+  } catch(e) {
+    status.textContent = '❌ ' + e.message;
+    status.className = 'mt-3 text-sm text-red-600';
+    wizToken = '';
+  }
+  btn.disabled = false;
+}
+
+// ── Step 2: Select file ────────────────────────────────────────────────
 function selectFile(fileName) {
-  document.getElementById('m-filename').value = fileName;
-  updatePathPreview();
+  wizFile = fileName;
   document.querySelectorAll('#files-list button').forEach(b => {
     const sel = b.getAttribute('onclick').includes(`'${fileName}'`);
     b.classList.toggle('ring-2', sel);
     b.classList.toggle('ring-blue-500', sel);
   });
+  // Enable "next" button
+  const nxt = document.getElementById('wiz-next');
+  if (nxt) nxt.disabled = false;
 }
 
-// ── Settings modal ─────────────────────────────────────────────────────
-function openSettings() {
-  document.getElementById('m-apikey').value   = cfg.apiKey    || '';
-  document.getElementById('m-ext').value      = cfg.extension || '';
-  document.getElementById('m-filename').value = cfg.fileName  || '';
-  updatePathPreview();
-  if (headers.length) buildColInputs();
-  document.getElementById('col-section').classList.toggle('hidden', !headers.length);
-  document.getElementById('test-res').textContent = '';
-  document.getElementById('files-found').classList.add('hidden');
-  document.getElementById('modal').classList.remove('hidden');
+// ── Step 3: Save & load ────────────────────────────────────────────────
+function readSettings() {
+  const labels = {};
+  document.querySelectorAll('.col-lbl').forEach(inp => {
+    const c = inp.dataset.col, v = inp.value.trim();
+    if (v && v !== c) labels[c] = v;
+  });
+  return {
+    apiKey:       wizToken,
+    extension:    wizExt,
+    fileName:     wizFile,
+    columnLabels: labels
+  };
 }
-function closeSettings() { document.getElementById('modal').classList.add('hidden'); }
 
-function updatePathPreview() {
-  const ext  = document.getElementById('m-ext').value.trim()      || '__';
-  const file = document.getElementById('m-filename').value.trim() || 'approval_all.ymgr';
-  document.getElementById('path-preview').textContent = `ivr2:${ext}/${file}`;
+async function doSaveLoad() {
+  cfg = readSettings();
+  saveCfg();
+  closeSettings();
+  await doLoad();
 }
 
 function buildColInputs() {
-  const labels = cfg.columnLabels||{};
+  const labels = cfg.columnLabels || {};
   document.getElementById('col-inputs').innerHTML = headers.map(h =>
     `<div class="flex items-center gap-2">
       <span class="text-xs text-gray-400 w-36 truncate font-mono" title="${esc(h)}">${esc(h)}</span>
@@ -506,52 +679,6 @@ function buildColInputs() {
         data-col="${esc(h)}" value="${esc(labels[h]||'')}" placeholder="${esc(h)}">
     </div>`
   ).join('');
-}
-
-function readSettings() {
-  const labels = {};
-  document.querySelectorAll('.col-lbl').forEach(inp => {
-    const c = inp.dataset.col, v = inp.value.trim();
-    if (v && v !== c) labels[c] = v;
-  });
-  return {
-    apiKey:       document.getElementById('m-apikey').value.trim(),
-    extension:    document.getElementById('m-ext').value.trim(),
-    fileName:     document.getElementById('m-filename').value.trim(),
-    columnLabels: labels
-  };
-}
-
-async function doTest() {
-  const btn = document.getElementById('test-btn');
-  const res = document.getElementById('test-res');
-  btn.disabled = true; res.textContent = 'בודק...'; res.className = 'text-sm text-gray-500';
-  const s = readSettings();
-  if (!s.apiKey)    { res.textContent = '❌ נדרש מפתח API';    res.className = 'text-sm text-red-600'; btn.disabled = false; return; }
-  if (!s.extension) { res.textContent = '❌ נדרש מספר שלוחה'; res.className = 'text-sm text-red-600'; btn.disabled = false; return; }
-  try {
-    const r = await fetch('/api/get-data', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ token: s.apiKey, extension: s.extension, fileName: s.fileName || '' })
-    });
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.message);
-    res.textContent = `✅ חיבור הצליח! נמצאו ${d.rows?.length ?? 0} רשומות`;
-    res.className = 'text-sm text-green-600 font-semibold';
-  } catch(e) {
-    res.textContent = '❌ ' + e.message;
-    res.className = 'text-sm text-red-600';
-  }
-  btn.disabled = false;
-}
-
-async function doSaveLoad() {
-  cfg = readSettings();
-  saveCfg();
-  token = null;
-  closeSettings();
-  await doLoad();
 }
 
 // ── UI helpers ─────────────────────────────────────────────────────────
@@ -577,7 +704,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
 // ── Init ───────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  if (cfg.apiKey && cfg.extension) doLoad();
+  if (cfg.apiKey && cfg.extension && cfg.fileName) doLoad();
 });
 </script>
 </body>

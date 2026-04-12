@@ -62,10 +62,14 @@ app.post('/api/get-data', async (req, res) => {
   }
 });
 
-// ─── List files in a path (tries sibling paths) ───────────────────────────────
+// ─── Test token validity ───────────────────────────────────────────────────────
+app.post('/api/test-token', async (req, res) => {
+  return require('./api/test-token')(req, res);
+});
+
+// ─── List files in a path ─────────────────────────────────────────────────────
 app.post('/api/list-files', async (req, res) => {
-  const listFiles = require('./api/list-files');
-  return listFiles(req, res);
+  return require('./api/list-files')(req, res);
 });
 
 // ─── Generic proxy (for advanced / custom endpoints) ──────────────────────────
