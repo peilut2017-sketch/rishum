@@ -3,11 +3,6 @@ const fetch = require('node-fetch');
 const API_BASE = 'https://www.call2all.co.il/ym/api';
 const enc = encodeURIComponent;
 
-// Parse YMGR raw content:
-//   Each line = one record
-//   Fields separated by '*'
-//   Key ^ Value within each field
-//   e.g. "שם^ישראל*טלפון^050-1234567"
 function parseYmgrContent(raw) {
   if (!raw || !raw.trim()) return { headers: [], rows: [] };
 
@@ -45,7 +40,8 @@ module.exports = async (req, res) => {
   const file = fileName || 'APPROVALALL.YMGR';
   const ext  = String(extension).replace(/^\//, '');
   const path = `ivr2:${ext}/${file}`;
-  const url  = `${API_BASE}/DownloadFile?path=${enc(path)}`;
+  // token both in URL and header for maximum compatibility
+  const url  = `${API_BASE}/DownloadFile?path=${enc(path)}&token=${enc(token)}`;
 
   try {
     const r    = await fetch(url, { headers: { authorization: token } });
@@ -56,10 +52,16 @@ module.exports = async (req, res) => {
     }
 
     if (text.trimStart().startsWith('<')) {
-      return res.json({ ok: false, message: `שגיאת שרת — בדוק token ומספר שלוחה (${r.status})` });
+      return res.json({ ok: false, message: `שגיאת שרת ${r.status} — בדוק token ומספר שלוחה`, debug: text.slice(0, 200) });
     }
 
     const parsed = parseYmgrContent(text);
+
+    if (!parsed.rows.length) {
+      // File exists but couldn't parse as YMGR — return raw for debugging
+      return res.json({ ok: false, message: 'הקובץ נמצא אך לא ניתן לפרסר — פורמט לא צפוי', debug: text.slice(0, 300) });
+    }
+
     res.json({ ok: true, ...parsed, raw: text });
 
   } catch (e) {

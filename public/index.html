@@ -448,7 +448,18 @@ async function doSearchFiles() {
     if (!d.ok) throw new Error(d.message || 'שגיאה בחיפוש קבצים');
 
     if (!d.files || d.files.length === 0) {
-      list.innerHTML = '<p class="text-sm text-gray-400 py-2">לא נמצאו קבצים בנתיב זה</p>';
+      const debug = d.debugSample ? `<details class="mt-2"><summary class="text-xs text-gray-400 cursor-pointer">תגובת שרת (debug)</summary><pre class="text-xs bg-gray-100 rounded p-2 mt-1 overflow-x-auto whitespace-pre-wrap break-all">${esc(d.debugSample)}</pre></details>` : '';
+      list.innerHTML = `
+        <p class="text-sm text-amber-600 font-medium py-1">לא נמצאו קבצים — הזן שם קובץ ידנית:</p>
+        ${debug}
+        <div class="flex gap-2 mt-2">
+          <input id="manual-filename" type="text" placeholder="למשל: APPROVALALL.YMGR"
+            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
+          <button onclick="selectManualFile()"
+            class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded-lg transition whitespace-nowrap">
+            בחר
+          </button>
+        </div>`;
     } else {
       list.innerHTML = d.files.map(f => `
         <button type="button" onclick="selectFile('${esc(f.fileName)}')"
@@ -607,6 +618,12 @@ function onTokenInput() {
 }
 
 // ── Step 2: Select file ────────────────────────────────────────────────
+function selectManualFile() {
+  const val = (document.getElementById('manual-filename')?.value || '').trim();
+  if (!val) return;
+  selectFile(val);
+}
+
 function selectFile(fileName) {
   wizFile = fileName;
   document.querySelectorAll('#files-list button').forEach(b => {
