@@ -55,7 +55,7 @@ module.exports = async (req, res) => {
   const what = `ivr2:${ext}/${file}`;
 
   // RenderYMGRFile with format=html returns a readable HTML table
-  const url = `${API_BASE}/RenderYMGRFile?what=${enc(what)}&format=html&token=${enc(token)}`;
+  const url = `${API_BASE}/RenderYMGRFile?wath=${enc(what)}&format=html&token=${enc(token)}`;
 
   try {
     const r    = await fetch(url, { headers: { authorization: token } });

@@ -10,7 +10,7 @@ const COMMON_FILES = [
 
 async function tryFile(token, ext, fileName) {
   const what = `ivr2:${ext}/${fileName}`;
-  const url  = `${API_BASE}/RenderYMGRFile?what=${enc(what)}&format=html&token=${enc(token)}`;
+  const url  = `${API_BASE}/RenderYMGRFile?wath=${enc(what)}&format=html&token=${enc(token)}`;
   try {
     const r    = await Promise.race([
       fetch(url, { headers: { authorization: token } }),
