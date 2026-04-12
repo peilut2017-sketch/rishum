@@ -17,14 +17,14 @@ async function tryFile(token, ext, fileName) {
       new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 7000))
     ]);
     const html = await r.text();
-    if (!html || !html.trim())  return null;
-    if (!html.includes('<td')) return null; // no data cells → file empty or missing
+    const preview = (html || '').slice(0, 200);
 
-    // Count <tr> rows (minus header)
+    if (!html || !html.trim())  return { found: false, fileName, preview: '(empty)' };
+    if (!html.includes('<td'))  return { found: false, fileName, preview };
+
     const rowCount = (html.match(/<tr[^>]*>/gi) || []).length - 1;
-    if (rowCount < 1) return null;
+    if (rowCount < 1) return { found: false, fileName, preview };
 
-    // Extract header names from <th> cells
     const headers = [];
     const thRe = /<th[^>]*>([\s\S]*?)<\/th>/gi;
     let m;
@@ -32,9 +32,9 @@ async function tryFile(token, ext, fileName) {
       headers.push(m[1].replace(/<[^>]+>/g, '').trim());
     }
 
-    return { path: `ivr2:/${ext}/${fileName}`, fileName, headers, rowCount };
-  } catch {
-    return null;
+    return { found: true, path: `ivr2:/${ext}/${fileName}`, fileName, headers, rowCount };
+  } catch(e) {
+    return { found: false, fileName, preview: e.message };
   }
 }
 
@@ -47,7 +47,8 @@ module.exports = async (req, res) => {
   const ext = String(extension).replace(/^\//, '');
 
   const results = await Promise.all(COMMON_FILES.map(f => tryFile(token, ext, f)));
-  const found   = results.filter(Boolean);
+  const found   = results.filter(r => r.found);
+  const debug   = results.filter(r => !r.found).slice(0, 2); // first 2 failures for diagnosis
 
-  res.json({ ok: true, files: found });
+  res.json({ ok: true, files: found, debug });
 };
