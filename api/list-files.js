@@ -47,19 +47,17 @@ module.exports = async (req, res) => {
   const { token, basePath, apiBase } = req.body;
   const base = (apiBase || DEFAULT_BASE).replace(/\/$/, '');
 
-  // Build list of paths to try:
-  // 1. The exact path given
-  // 2. Siblings: if path ends with /N, try /1 through /9
+  // Build list of paths to try (with and without leading slash, + siblings)
   const pathsToTry = new Set([basePath]);
-
-  const parts = basePath.replace(/\/$/, '').split('/').filter(Boolean);
+  const normalized = basePath.startsWith('/') ? basePath : '/' + basePath;
+  const parts = normalized.replace(/\/$/, '').split('/').filter(Boolean);
   const parent = '/' + parts.slice(0, -1).join('/');
 
   for (let i = 1; i <= 9; i++) {
     pathsToTry.add(`${parent}/${i}`);
+    pathsToTry.add(`${parent.slice(1)}/${i}`); // without leading slash
   }
 
-  // Also try the parent itself in case it returns a listing
   if (parent && parent !== '/') pathsToTry.add(parent);
 
   const attempts = [...pathsToTry].map(p => tryPath(base, token, p));
