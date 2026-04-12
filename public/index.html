@@ -107,6 +107,9 @@
         class="flex-1 sm:flex-none touch-btn bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg gap-1 transition">
         ⬇️ <span class="hidden sm:inline">ייצוא</span> CSV
       </button>
+      <button id="add-row-btn" onclick="openAddRow()" class="hidden flex-1 sm:flex-none touch-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg gap-1 transition">
+        ➕ <span class="hidden sm:inline">הוסף</span> שורה
+      </button>
     </div>
     <span id="rec-count" class="text-xs text-gray-500"></span>
   </div>
@@ -280,6 +283,37 @@
   </div>
 </div>
 
+<!-- ═══ CRUD MODAL ═══════════════════════════════════════════════════ -->
+<div id="crud-modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-start justify-center p-4 overflow-y-auto">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg fade-in my-4 flex flex-col">
+    <div class="bg-blue-900 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
+      <h2 id="crud-title" class="font-bold text-lg"></h2>
+      <button onclick="closeCrudModal()" class="text-blue-200 hover:text-white text-2xl leading-none">✕</button>
+    </div>
+    <div id="crud-body" class="p-6 overflow-y-auto flex-1" style="max-height:65vh"></div>
+    <div class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t flex-shrink-0 flex justify-between items-center gap-3">
+      <button onclick="closeCrudModal()" class="text-sm text-gray-500 hover:text-gray-700">ביטול</button>
+      <div id="crud-submit-area"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ DELETE CONFIRM MODAL ═══════════════════════════════════════ -->
+<div id="del-modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in p-6 text-center">
+    <p class="text-4xl mb-3">🗑️</p>
+    <h3 class="font-bold text-gray-800 text-lg mb-2">מחיקת שורה</h3>
+    <p class="text-sm text-gray-500 mb-4">פעולה זו בלתי הפיכה. האם למחוק את השורה?</p>
+    <div id="del-preview" class="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-5 text-right max-h-24 overflow-y-auto leading-relaxed"></div>
+    <div class="flex gap-3">
+      <button onclick="closeDelModal()"
+        class="flex-1 border border-gray-300 text-gray-600 py-2.5 rounded-lg text-sm hover:bg-gray-50 transition">ביטול</button>
+      <button id="del-confirm-btn" onclick="confirmDelete()"
+        class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">מחק</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ SCRIPT ════════════════════════════════════════════════════════ -->
 <script>
 // ── State ──────────────────────────────────────────────────────────────
@@ -297,6 +331,9 @@ let pendingNewRows = null;
 let pendingNewData = null;
 let autoRefreshTimer = null;
 const AUTO_REFRESH_MS = 60000; // check every 60 seconds
+// CRUD
+let crudContentHash = '';
+let pendingDeleteRow = null;
 
 // ── Config (localStorage) ──────────────────────────────────────────────
 function loadCfg() {
@@ -384,8 +421,9 @@ function render() {
 function renderTable() {
   const labels = cfg.columnLabels || {};
 
-  // Header
+  // Header — actions column first
   document.getElementById('tbl-head').innerHTML = '<tr class="border-b">' +
+    `<th class="px-2 py-3 text-center text-xs font-semibold text-gray-500 bg-gray-50 w-16">פעולות</th>` +
     headers.map(h => {
       const arrow = sortCol===h ? (sortDir==='asc'?' ▲':' ▼') : '';
       return `<th onclick="doSort('${esc(h)}')"
@@ -398,14 +436,22 @@ function renderTable() {
   const rows = perPage===0 ? filtered : filtered.slice((page-1)*perPage, page*perPage);
   if (!rows.length) {
     document.getElementById('tbl-body').innerHTML =
-      `<tr><td colspan="${headers.length}" class="text-center py-12 text-gray-400">לא נמצאו רשומות</td></tr>`;
+      `<tr><td colspan="${headers.length + 1}" class="text-center py-12 text-gray-400">לא נמצאו רשומות</td></tr>`;
     return;
   }
-  document.getElementById('tbl-body').innerHTML = rows.map((r, i) =>
-    `<tr class="${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors">` +
-    headers.map(h => `<td class="px-4 py-3 text-gray-700 border-b border-gray-100 whitespace-nowrap">${esc(r[h]||'')}</td>`).join('') +
-    '</tr>'
-  ).join('');
+  document.getElementById('tbl-body').innerHTML = rows.map((r, i) => {
+    const aid = r['ApiCallId'] || '';
+    const editBtn = aid
+      ? `<button onclick="openEditRow('${esc(aid)}')" title="עריכה" class="touch-btn text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded p-1 transition text-sm">✏️</button>`
+      : `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">✏️</button>`;
+    const delBtn = aid
+      ? `<button onclick="openDeleteRow('${esc(aid)}')" title="מחיקה" class="touch-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition text-sm">🗑️</button>`
+      : `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">🗑️</button>`;
+    return `<tr class="${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors">` +
+      `<td class="px-2 py-2 border-b border-gray-100"><div class="flex gap-0.5 justify-center">${editBtn}${delBtn}</div></td>` +
+      headers.map(h => `<td class="px-4 py-3 text-gray-700 border-b border-gray-100 whitespace-nowrap">${esc(r[h]||'')}</td>`).join('') +
+      '</tr>';
+  }).join('');
 }
 
 function renderPagination() {
@@ -477,12 +523,14 @@ async function doLoad() {
     const d = await fetchData();
     headers = d.headers;
     allRows = d.rows;
+    if (d.contentHash) crudContentHash = d.contentHash;
     calcStats();
     search=''; page=1;
     document.getElementById('search').value='';
     setState('table');
     render();
     calcPivots();
+    document.getElementById('add-row-btn').classList.remove('hidden');
     _updateNavSub();
     showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
     startAutoRefresh();
@@ -535,6 +583,7 @@ function applyPendingData() {
   hideBanner();
   headers = d.headers;
   allRows = d.rows;
+  if (d.contentHash) crudContentHash = d.contentHash;
   calcStats();
   search = ''; page = 1;
   document.getElementById('search').value = '';
@@ -837,6 +886,153 @@ function buildColInputs() {
         data-col="${esc(h)}" value="${esc(labels[h]||'')}" placeholder="${esc(h)}">
     </div>`
   ).join('');
+}
+
+// ── CRUD helpers ──────────────────────────────────────────────────────
+const CRUD_READONLY = ['ApiCallId', 'ApiTime', 'ApiPhone', 'ApiExtension'];
+
+function closeCrudModal() { document.getElementById('crud-modal').classList.add('hidden'); }
+function closeDelModal()  { document.getElementById('del-modal').classList.add('hidden'); pendingDeleteRow = null; }
+
+// Build a form field for one column
+function _crudField(h, val, readOnly) {
+  const label = (cfg.columnLabels || {})[h] || h;
+  if (readOnly) return `
+    <div class="mb-3">
+      <label class="block text-xs font-semibold text-gray-400 mb-0.5">${esc(label)} <span class="font-normal">(קריאה בלבד)</span></label>
+      <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 font-mono truncate">${esc(val||'—')}</div>
+    </div>`;
+  return `
+    <div class="mb-3">
+      <label class="block text-xs font-semibold text-gray-700 mb-0.5">${esc(label)}</label>
+      <input type="text" class="crud-field w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+        data-col="${esc(h)}" value="${esc(val||'')}" placeholder="${esc(h)}">
+    </div>`;
+}
+
+// Read all crud-field inputs → rowData object (commas stripped)
+function _readCrudFields() {
+  const rowData = {};
+  let hasComma = false;
+  document.querySelectorAll('#crud-body .crud-field').forEach(inp => {
+    const v = inp.value;
+    if (v.includes(',')) { hasComma = true; inp.value = v.replace(/,/g, ''); }
+    rowData[inp.dataset.col] = inp.value;
+  });
+  if (hasComma) showAlert('warning', 'פסיקים הוסרו מהערכים — הם עלולים לשבור את מבנה הקובץ');
+  return rowData;
+}
+
+// POST to /api/crud
+async function _callCrud(payload) {
+  const r = await fetch('/api/crud', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ token: cfg.apiKey, extension: cfg.extension, fileName: cfg.fileName, ...payload }),
+  });
+  return r.json();
+}
+
+// ── Open Edit modal ────────────────────────────────────────────────────
+function openEditRow(apiCallId) {
+  const row = allRows.find(r => r['ApiCallId'] === apiCallId);
+  if (!row) { showAlert('error', 'שורה לא נמצאה'); return; }
+
+  document.getElementById('crud-title').textContent = '✏️ עריכת שורה';
+  document.getElementById('crud-body').innerHTML =
+    headers.map(h => _crudField(h, row[h], CRUD_READONLY.includes(h))).join('');
+  document.getElementById('crud-submit-area').innerHTML =
+    `<button onclick="submitEdit('${esc(apiCallId)}')"
+      class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
+      שמור שינויים
+    </button>`;
+  document.getElementById('crud-modal').classList.remove('hidden');
+}
+
+async function submitEdit(apiCallId) {
+  const rowData = _readCrudFields();
+  const btn = document.querySelector('#crud-submit-area button');
+  btn.disabled = true; btn.textContent = 'שומר...';
+  try {
+    const d = await _callCrud({ action: 'edit', apiCallId, rowData, clientHash: crudContentHash });
+    if (d.conflict) { closeCrudModal(); showAlert('warning', d.message); return; }
+    if (!d.ok) throw new Error(d.message || 'שגיאה בשמירה');
+    if (d.newHash) crudContentHash = d.newHash;
+    // Update row in local state
+    const idx = allRows.findIndex(r => r['ApiCallId'] === apiCallId);
+    if (idx !== -1) allRows[idx] = { ...allRows[idx], ...rowData };
+    closeCrudModal();
+    render(); calcPivots(); calcStats();
+    showAlert('success', 'השורה עודכנה בהצלחה ✅');
+  } catch(e) {
+    showAlert('error', e.message);
+    btn.disabled = false; btn.textContent = 'שמור שינויים';
+  }
+}
+
+// ── Open Add modal ─────────────────────────────────────────────────────
+function openAddRow() {
+  if (!headers.length) { showAlert('warning', 'טען נתונים תחילה'); return; }
+  document.getElementById('crud-title').textContent = '➕ הוספת שורה חדשה';
+  document.getElementById('crud-body').innerHTML =
+    headers.filter(h => !CRUD_READONLY.includes(h))
+           .map(h => _crudField(h, '', false)).join('');
+  document.getElementById('crud-submit-area').innerHTML =
+    `<button onclick="submitAdd()"
+      class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
+      ➕ הוסף שורה
+    </button>`;
+  document.getElementById('crud-modal').classList.remove('hidden');
+}
+
+async function submitAdd() {
+  const rowData = _readCrudFields();
+  const btn = document.querySelector('#crud-submit-area button');
+  btn.disabled = true; btn.textContent = 'מוסיף...';
+  try {
+    const d = await _callCrud({ action: 'add', rowData });
+    if (!d.ok) throw new Error(d.message || 'שגיאה בהוספה');
+    if (d.newHash) crudContentHash = d.newHash;
+    closeCrudModal();
+    await doLoad(); // reload to fetch the new row from server
+  } catch(e) {
+    showAlert('error', e.message);
+    btn.disabled = false; btn.textContent = '➕ הוסף שורה';
+  }
+}
+
+// ── Open Delete confirmation ───────────────────────────────────────────
+function openDeleteRow(apiCallId) {
+  const row = allRows.find(r => r['ApiCallId'] === apiCallId);
+  if (!row) { showAlert('error', 'שורה לא נמצאה'); return; }
+  pendingDeleteRow = row;
+  const preview = headers.slice(0, 6)
+    .map(h => `<span class="font-semibold text-gray-600">${esc((cfg.columnLabels||{})[h]||h)}:</span> ${esc(row[h]||'—')}`)
+    .join('<br>');
+  document.getElementById('del-preview').innerHTML = preview;
+  const btn = document.getElementById('del-confirm-btn');
+  btn.disabled = false; btn.textContent = 'מחק';
+  document.getElementById('del-modal').classList.remove('hidden');
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteRow) return;
+  const apiCallId = pendingDeleteRow['ApiCallId'];
+  const btn = document.getElementById('del-confirm-btn');
+  btn.disabled = true; btn.textContent = 'מוחק...';
+  try {
+    const d = await _callCrud({ action: 'delete', apiCallId, clientHash: crudContentHash });
+    if (d.conflict) { closeDelModal(); showAlert('warning', d.message); return; }
+    if (!d.ok) throw new Error(d.message || 'שגיאה במחיקה');
+    if (d.newHash) crudContentHash = d.newHash;
+    allRows = allRows.filter(r => r['ApiCallId'] !== apiCallId);
+    closeDelModal();
+    calcStats(); render(); calcPivots();
+    showAlert('success', 'השורה נמחקה בהצלחה ✅');
+  } catch(e) {
+    showAlert('error', e.message);
+    btn.disabled = false; btn.textContent = 'מחק';
+  }
 }
 
 // ── Pivot calculation & render ─────────────────────────────────────────

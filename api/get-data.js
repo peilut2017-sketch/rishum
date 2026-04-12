@@ -92,7 +92,12 @@ module.exports = async (req, res) => {
       return res.json({ ok: false, message: 'לא נמצאו שורות נתונים', rawPreview: text.slice(0, 500) });
     }
 
-    res.json({ ok: true, headers: parsed.headers, rows: parsed.rows });
+    // Simple content hash for optimistic locking in CRUD operations
+    const lastRow  = parsed.rows[parsed.rows.length - 1];
+    const lastId   = lastRow ? (lastRow['ApiCallId'] || '') : '';
+    const contentHash = `${parsed.rows.length}:${encodeURIComponent(lastId).slice(0, 40)}`;
+
+    res.json({ ok: true, headers: parsed.headers, rows: parsed.rows, contentHash });
 
   } catch (e) {
     res.status(502).json({ ok: false, message: e.message });
