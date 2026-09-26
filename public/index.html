@@ -238,13 +238,41 @@ let _activeCity=null,_drillFiltered=[],_drillPage=1;
 let _drillSort=null,_drillSortAsc=true,_timerInterval=null,_cdCount=CONFIG.refreshSec,_paused=false;
 const PAGE_SIZE=50;
 const COL_CLS=['cc0','cc1','cc2','cc3','cc4','cc5','cc6','cc7','cc8','cc9','cc10','cc11'];
-// שם השדה בו נשמר קובץ ההקלטה של השיחה (אם קיים) — מזוהה אוטומטית לפי סיומת קובץ אודיו
-function findRecordingRef(rec){
-  for(const k of Object.keys(rec)){
-    const v=rec[k];
-    if(typeof v==='string'&&/\.(wav|mp3|amr|gsm|marc)$/i.test(v.trim()))return v.trim();
+// ═══ הקלטות: נשמרות בתת-שלוחה "Record", בשם קובץ כמו:
+// OK-שמחת בית השואבה תשפז-1120-Phone-0548507931-Date-2026-09-27-01-08-19-Data-P050-1-P051-4.wav
+// ═══
+let _recordingMap=new Map();
+function parseRecordingFilename(name){
+  const info={};
+  const phoneM=name.match(/-Phone-(\d+)-/);
+  if(phoneM)info.phone=phoneM[1];
+  const dataM=name.match(/-Data-(.+)\.\w+$/i);
+  if(dataM){
+    const parts=dataM[1].split('-');
+    for(let i=0;i+1<parts.length;i+=2){
+      if(/^P\d{2,3}$/i.test(parts[i]))info[parts[i].toUpperCase()]=parts[i+1];
+    }
   }
-  return null;
+  return info;
+}
+function recordingKey(phone,p050,p051){return `${phone}|${p050}|${p051}`}
+async function loadRecordings(){
+  const map=new Map();
+  const{files}=await getDir(`${CONFIG.folder}/Record`);
+  for(const f of files){
+    if(!f||!/\.(wav|mp3|amr|gsm|marc)$/i.test(f))continue;
+    const info=parseRecordingFilename(f);
+    if(info.phone&&info[CITY_KEY]&&info[QTY_KEY]){
+      map.set(recordingKey(info.phone,info[CITY_KEY],info[QTY_KEY]),f);
+    }
+  }
+  _recordingMap=map;
+}
+// מוצא את קובץ ההקלטה התואם לרשומה, לפי טלפון+עיר+כמות (אותם ערכים ששמורים בשם הקובץ)
+function findRecordingRef(rec){
+  const phone=rec['Phone']||rec['phone']||rec['Folder']||'';
+  if(!phone)return null;
+  return _recordingMap.get(recordingKey(phone,rec[CITY_KEY],rec[QTY_KEY]))||null;
 }
 
 function qs(id){return document.getElementById(id)}
@@ -302,14 +330,13 @@ async function downloadFile(path,timeoutMs=15000){
     return(t&&!t.includes('"responseStatus":"ERROR"'))?t:null;
   }catch{return null}
 }
-// משמיע קובץ הקלטה השמור לצד הרשומה (שם קובץ אודיו זוהה ע"י findRecordingRef)
+// משמיע קובץ הקלטה מתת-השלוחה Record (שם הקובץ תואם לרשומה לפי findRecordingRef)
 async function playRecording(path,btn){
   const orig=btn.textContent;
   btn.disabled=true;btn.textContent='⏳';
   try{
     const tok=await ensureToken();
-    const full=path.includes('/')?path:`${CONFIG.folder}/${path}`;
-    const url=`${API}DownloadFile?token=${tok}&path=ivr2:${full}`;
+    const url=`${API}DownloadFile?token=${tok}&path=ivr2:${CONFIG.folder}/Record/${path}`;
     const audio=new Audio(url);
     audio.addEventListener('ended',()=>{btn.disabled=false;btn.textContent=orig});
     audio.addEventListener('error',()=>{btn.disabled=false;btn.textContent=orig;alert('לא ניתן להשמיע את ההקלטה')});
@@ -474,6 +501,7 @@ async function loadData(){
       _records=[...byPhone.values()];
     }
     buildColumns(_records);
+    await loadRecordings();
     renderDashboard();
   }catch(e){console.error(e);if(e.message.includes('CORS')||e.message.includes('network')||e.message.includes('Failed to fetch')){qs('cors-tip').hidden=false}else{setStatus('err',e.message.slice(0,40))}qs('city-grid').innerHTML=`<div class="empty"><div class="ico">❌</div><p>${esc(e.message)}</p></div>`}
 }
