@@ -212,44 +212,40 @@ tbody td.idx{color:var(--muted);font-size:12px;text-align:left}
 const CONFIG={
   sysNum:   '033050999',
   password: '556778',
-  folder:   '2/1',     // שלוחה
+  folder:   '2/4',     // שלוחה
   refreshSec: 10
 };
 // ════════════════════════════════════════════
 // מיפוי שדות מ-ApprovalAll.ini
+// P050 = עיר, P051 = כמות מקומות שהוזמנו לאותה עיר
 // ════════════════════════════════════════════
 const FIELD_LABELS={
   'P050': 'עיר',
-  'P051': 'שכונה',
-  'P052': 'בתוך רמות'
+  'P051': 'כמות מקומות'
 };
 // ערים: P050+N
 const CITY_MAP={
   '1':'ירושלים','2':'בני ברק','3':'בית שמש',
   '4':'מודיעין עילית','5':'ביתר','6':'אלעד'
 };
-// שכונות: P051+N
-const NBHD_MAP={
-  '1':'רמת שלמה','2':'נווה יעקב','3':'גבעת שאול',
-  '4':'הר נוף','5':'בית וגן','6':'יקירי ירושלים',
-  '7':'שכונות הצפון','8':'סנהדריה, סנהדריה מורחבת ורמת אשכול',
-  '9':'בר אילן שמואל הנביא','0':'רמות'
-};
-// בתוך רמות: P052+N
-const RAMOT_MAP={
-  '1':'רמות א','2':'רמות ב','3':'רמות ג',
-  '4':'רמות ד','5':'רמות פולין'
-};
 
 const API='https://private.call2all.co.il/ym/api/';
 let _token=null,_tokenAt=0,_records=[],_columns=[];
 // שדות קבועים לפי ApprovalAll.ini
 const CITY_KEY='P050';
-const NBHD_KEY='P051';
-let _activeCity=null,_activeNbhd=null,_drillFiltered=[],_drillPage=1;
+const QTY_KEY='P051'; // כמות מקומות שהוזמנו
+let _activeCity=null,_drillFiltered=[],_drillPage=1;
 let _drillSort=null,_drillSortAsc=true,_timerInterval=null,_cdCount=CONFIG.refreshSec,_paused=false;
 const PAGE_SIZE=50;
 const COL_CLS=['cc0','cc1','cc2','cc3','cc4','cc5','cc6','cc7','cc8','cc9','cc10','cc11'];
+// שם השדה בו נשמר קובץ ההקלטה של השיחה (אם קיים) — מזוהה אוטומטית לפי סיומת קובץ אודיו
+function findRecordingRef(rec){
+  for(const k of Object.keys(rec)){
+    const v=rec[k];
+    if(typeof v==='string'&&/\.(wav|mp3|amr|gsm|marc)$/i.test(v.trim()))return v.trim();
+  }
+  return null;
+}
 
 function qs(id){return document.getElementById(id)}
 function setStatus(cls,txt){qs('dot').className='dot '+cls;qs('status-lbl').textContent=txt}
@@ -260,8 +256,6 @@ function credsOK(){return CONFIG.sysNum!=='XXXXX'&&CONFIG.password!=='YYYYY'}
 
 // תרגום ערכים מספריים לשמות
 function cityLabel(v){return CITY_MAP[String(v)]||'(לא ידוע)'}
-function nbhdLabel(v){return NBHD_MAP[String(v)]||'(לא ידוע)'}
-function ramotLabel(v){return RAMOT_MAP[String(v)]||''}
 
 // תרגום שמות עמודות טכניות לעברית
 function colLabel(k){
@@ -307,6 +301,24 @@ async function downloadFile(path,timeoutMs=15000){
     const t=await r.text();
     return(t&&!t.includes('"responseStatus":"ERROR"'))?t:null;
   }catch{return null}
+}
+// משמיע קובץ הקלטה השמור לצד הרשומה (שם קובץ אודיו זוהה ע"י findRecordingRef)
+async function playRecording(path,btn){
+  const orig=btn.textContent;
+  btn.disabled=true;btn.textContent='⏳';
+  try{
+    const tok=await ensureToken();
+    const full=path.includes('/')?path:`${CONFIG.folder}/${path}`;
+    const url=`${API}DownloadFile?token=${tok}&path=ivr2:${full}`;
+    const audio=new Audio(url);
+    audio.addEventListener('ended',()=>{btn.disabled=false;btn.textContent=orig});
+    audio.addEventListener('error',()=>{btn.disabled=false;btn.textContent=orig;alert('לא ניתן להשמיע את ההקלטה')});
+    await audio.play();
+    btn.textContent='⏸ מתנגן…';
+  }catch(e){
+    btn.disabled=false;btn.textContent=orig;
+    alert('שגיאה בהשמעת ההקלטה: '+e.message);
+  }
 }
 async function getDir(path){
   const tok=await ensureToken();
@@ -379,7 +391,7 @@ function parseYMGR(text){
 function buildColumns(records){
   const keys=[...new Set(records.flatMap(r=>Object.keys(r)))];
   // עמודות מועדפות קודם
-  const prio=['ValName','Phone','Date',CITY_KEY,NBHD_KEY,'P052','Status','Booking'];
+  const prio=['ValName','Phone','Date',CITY_KEY,QTY_KEY,'Status','Booking'];
   const hidden=['_path','_period','DID','IncomingDID','var','IdType','Data','Folder','HebrewDate','Time','EnterId','IdType'];
   _columns=keys.filter(k=>!hidden.includes(k));
   _columns.sort((a,b)=>{const ai=prio.indexOf(a),bi=prio.indexOf(b);
@@ -390,8 +402,6 @@ function buildColumns(records){
 function cellVal(rec,col){
   const v=rec[col]??'';
   if(col===CITY_KEY)return cityLabel(v);
-  if(col===NBHD_KEY)return nbhdLabel(v);
-  if(col==='P052')return ramotLabel(v);
   return v;
 }
 
@@ -496,142 +506,59 @@ function renderPieChart(cities){
   renderMiniPie(cities,'pie-wrap');
 }
 
-function getCityCounts(recs){
+// סכום "כמות מקומות" (P051) וספירת הזמנות, מקובצים לפי עיר
+function getCityStats(recs){
   const m={};
-  for(const r of recs){const c=cityLabel(r[CITY_KEY]);m[c]=(m[c]||0)+1}
-  return Object.entries(m).sort((a,b)=>b[1]-a[1])
-}
-function getNbhdCounts(recs){
-  const m={};
-  for(const r of recs){const n=nbhdLabel(r[NBHD_KEY]);m[n]=(m[n]||0)+1}
-  return Object.entries(m).sort((a,b)=>b[1]-a[1])
+  for(const r of recs){
+    const c=cityLabel(r[CITY_KEY]);
+    const qty=parseInt(r[QTY_KEY],10)||0;
+    if(!m[c])m[c]={seats:0,orders:0};
+    m[c].seats+=qty;m[c].orders+=1;
+  }
+  return Object.entries(m).map(([city,v])=>({city,seats:v.seats,orders:v.orders})).sort((a,b)=>b.seats-a.seats);
 }
 
 function renderDashboard(){
-  const allCities=getCityCounts(_records);
-  const cities=allCities.filter(([c])=>c!=='(לא ידוע)');
-  const unknownCount=allCities.find(([c])=>c==='(לא ידוע)')?.[1]||0;
-  const knownTotal=cities.reduce((s,[,n])=>s+n,0);
-  const total=_records.length;
-  qs('dash-meta').textContent=`${total.toLocaleString('he')} רשומות · ${cities.length} ערים (${knownTotal.toLocaleString('he')} עם נתוני עיר)`;
-  const maxN=cities[0]?.[1]||1;
+  const allCities=getCityStats(_records);
+  const cities=allCities.filter(c=>c.city!=='(לא ידוע)');
+  const unknown=allCities.find(c=>c.city==='(לא ידוע)');
+  const totalSeats=allCities.reduce((s,c)=>s+c.seats,0);
+  const totalOrders=_records.length;
+  qs('dash-meta').textContent=`${totalSeats.toLocaleString('he')} מקומות · ${totalOrders.toLocaleString('he')} הזמנות · ${cities.length} ערים`;
+  const maxSeats=cities[0]?.seats||1;
   let html=`<div class="city-card city-card-total" onclick="drillAll()" style="cursor:pointer">
-    <div class="city-count">${total.toLocaleString('he')}</div>
-    <div class="city-name">כל הרשומות</div>
-    ${unknownCount?`<div class="city-pct">${unknownCount.toLocaleString('he')} ללא עיר</div>`:''}
+    <div class="city-count">${totalSeats.toLocaleString('he')}</div>
+    <div class="city-name">סה"כ מקומות שהוזמנו</div>
+    <div class="city-pct">${totalOrders.toLocaleString('he')} הזמנות${unknown?` · ${unknown.seats.toLocaleString('he')} ללא עיר`:''}</div>
   </div>`;
-  cities.forEach(([city,count],i)=>{
-    const pct=Math.round(count/knownTotal*100),fw=Math.round(count/maxN*100);
-    html+=`<div class="city-card ${COL_CLS[i%12]}" data-city="${esc(city)}" onclick="drillCity(this.dataset.city)">
-      <div class="city-count">${count.toLocaleString('he')}</div>
-      <div class="city-name">${esc(city)}</div>
-      <div class="city-pct">${pct}%</div>
+  cities.forEach((c,i)=>{
+    const fw=Math.round(c.seats/maxSeats*100);
+    html+=`<div class="city-card ${COL_CLS[i%12]}" data-city="${esc(c.city)}" onclick="drillCity(this.dataset.city)">
+      <div class="city-count">${c.seats.toLocaleString('he')}</div>
+      <div class="city-name">${esc(c.city)}</div>
+      <div class="city-pct">${c.orders.toLocaleString('he')} הזמנות</div>
       <div class="bar-bg"><div class="bar-fill" style="width:${fw}%"></div></div>
     </div>`;
   });
   qs('city-grid').innerHTML=html;
-  renderPieChart(cities);
+  renderPieChart(cities.map(c=>[c.city,c.seats]));
 }
 
 function drillCity(raw){
   const city=raw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
-  _activeCity=city;_activeNbhd=null;_activeRamot=null;_drillPage=1;_drillSort=null;_drillSortAsc=true;
-  qs('ramot-section').hidden=true;
+  _activeCity=city;_drillPage=1;_drillSort=null;_drillSortAsc=true;
   qs('search-in').value='';
   const cityRecs=_records.filter(r=>cityLabel(r[CITY_KEY])===city);
+  const seats=cityRecs.reduce((s,r)=>s+(parseInt(r[QTY_KEY],10)||0),0);
   qs('drill-title').textContent=city;
-  qs('drill-count').textContent=`${cityRecs.length.toLocaleString('he')} רשומות`;
-  const allNbhds=getNbhdCounts(cityRecs);
-  console.log('שכונות ל'+city+':', JSON.stringify(allNbhds));
-  console.log('דוגמת P051:', cityRecs.slice(0,5).map(r=>r['P051']));
-  const nbhds=allNbhds.filter(([n])=>n!=='(לא ידוע)');
-  if(nbhds.length>0){
-    qs('nbhd-meta').textContent=`${nbhds.length} שכונות · ${cityRecs.length.toLocaleString('he')} רשומות`;
-    const nbhdTotal=nbhds.reduce((s,[,n])=>s+n,0);
-    const maxN=nbhds[0]?.[1]||1;
-    // כרטיסי שכונות (כמו כרטיסי ערים)
-    let html=`<div class="city-card city-card-total" style="cursor:pointer" data-nbhd="" onclick="filterNbhd(null)">
-      <div class="city-count">${cityRecs.length.toLocaleString('he')}</div>
-      <div class="city-name">הכל</div></div>`;
-    nbhds.forEach(([n,c],i)=>{
-      const pct=Math.round(c/nbhdTotal*100),fw=Math.round(c/maxN*100);
-      html+=`<div class="city-card ${COL_CLS[i%12]}" data-nbhd="${esc(n)}" onclick="filterNbhd(this.dataset.nbhd)">
-        <div class="city-count">${c.toLocaleString('he')}</div>
-        <div class="city-name">${esc(n)}</div>
-        <div class="city-pct">${pct}%</div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${fw}%"></div></div>
-      </div>`;
-    });
-    qs('nbhd-grid').innerHTML=html;
-    // עוגת שכונות
-    renderMiniPie(nbhds,'nbhd-pie-wrap');
-    qs('nbhd-section').hidden=false;
-  }else{qs('nbhd-section').hidden=true}
+  qs('drill-count').textContent=`${seats.toLocaleString('he')} מקומות · ${cityRecs.length.toLocaleString('he')} הזמנות`;
+  qs('nbhd-section').hidden=true;
+  qs('ramot-section').hidden=true;
   qs('view-dashboard').hidden=true;qs('view-city').hidden=false;
-  applyDrillFilter();
-}
-function filterNbhd(nbhd){
-  _activeNbhd=nbhd||null;_activeRamot=null;_drillPage=1;
-  qs('nbhd-grid').querySelectorAll('.city-card').forEach(el=>{
-    const isAll=el.dataset.nbhd==='';
-    const match=nbhd?el.dataset.nbhd===nbhd:isAll;
-    el.style.outline=match?'3px solid rgba(255,255,255,.7)':'';
-    el.style.opacity=match?'1':'0.7';
-  });
-  // פילוח בתוך רמות אם בחרו רמות
-  if(nbhd==='רמות'){
-    const cityBase=_activeCity==='__all__'?_records:_records.filter(r=>cityLabel(r[CITY_KEY])===_activeCity);
-    const ramotRecs=cityBase.filter(r=>nbhdLabel(r[NBHD_KEY])===nbhd);
-    const ramotCounts=getRamotCounts(ramotRecs);
-    const knownRamot=ramotCounts.filter(([n])=>n!=='(לא ידוע)');
-    if(knownRamot.length){
-      const ramotTotal=knownRamot.reduce((s,[,n])=>s+n,0);
-      const unknownRamot=ramotRecs.length-ramotTotal;
-      qs('ramot-meta').textContent=`${knownRamot.length} חלקים · ${ramotRecs.length.toLocaleString('he')} רשומות`;
-      const maxN=knownRamot[0]?.[1]||1;
-      let html=`<div class="city-card city-card-total" style="cursor:pointer" data-ramot="" onclick="filterRamot(null)">
-        <div class="city-count">${ramotRecs.length.toLocaleString('he')}</div>
-        <div class="city-name">כל רמות</div>
-        ${unknownRamot?`<div class="city-pct">${unknownRamot} ללא פרוט</div>`:''}
-        </div>`;
-      knownRamot.forEach(([n,c],i)=>{
-        const pct=Math.round(c/ramotTotal*100),fw=Math.round(c/maxN*100);
-        html+=`<div class="city-card ${COL_CLS[(i+5)%12]}" data-ramot="${esc(n)}" onclick="filterRamot(this.dataset.ramot)">
-          <div class="city-count">${c.toLocaleString('he')}</div>
-          <div class="city-name">${esc(n)}</div>
-          <div class="city-pct">${pct}%</div>
-          <div class="bar-bg"><div class="bar-fill" style="width:${fw}%"></div></div>
-        </div>`;
-      });
-      qs('ramot-grid').innerHTML=html;
-      renderMiniPie(knownRamot,'ramot-pie-wrap');
-      qs('ramot-section').hidden=false;
-    }else{qs('ramot-section').hidden=true}
-  }else{qs('ramot-section').hidden=true}
-  applyDrillFilter();
-}
-let _activeRamot=null;
-function getRamotCounts(recs){
-  const m={};
-  for(const r of recs){const n=ramotLabel(r['P052'])||'(לא ידוע)';m[n]=(m[n]||0)+1}
-  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
-}
-function filterRamot(ramot){
-  _activeRamot=ramot||null;
-  _activeNbhd='רמות'; // תמיד בתוך שכונת רמות
-  _drillPage=1;
-  qs('ramot-grid').querySelectorAll('.city-card').forEach(el=>{
-    const isAll=el.dataset.ramot==='';
-    const match=ramot?el.dataset.ramot===ramot:isAll;
-    el.style.outline=match?'3px solid rgba(255,255,255,.7)':'';
-    el.style.opacity=match?'1':'0.7';
-  });
   applyDrillFilter();
 }
 function applyDrillFilter(){
   let base=_activeCity==='__all__'?_records:_records.filter(r=>cityLabel(r[CITY_KEY])===_activeCity);
-  if(_activeNbhd)base=base.filter(r=>nbhdLabel(r[NBHD_KEY])===_activeNbhd);
-  if(_activeRamot)base=base.filter(r=>ramotLabel(r['P052'])===_activeRamot);
   const q=(qs('search-in').value||'').toLowerCase();
   _drillFiltered=q?base.filter(r=>_columns.some(c=>String(cellVal(r,c)).toLowerCase().includes(q))):base;
   renderDrillTable();
@@ -647,14 +574,21 @@ function renderDrillTable(){
   const start=(_drillPage-1)*PAGE_SIZE,pageRows=rows.slice(start,start+PAGE_SIZE);
   qs('drill-thead').innerHTML='<tr><th class="idx" style="width:36px">#</th>'+
     _columns.map(c=>{const s=_drillSort===c;return`<th class="${s?'sorted':''}" onclick="sortDrill('${c.replace(/'/g,"\\'")}')">
-      ${esc(colLabel(c))}<span class="sort-ico">${s?(_drillSortAsc?'▲':'▼'):'⇅'}</span></th>`}).join('')+'</tr>';
+      ${esc(colLabel(c))}<span class="sort-ico">${s?(_drillSortAsc?'▲':'▼'):'⇅'}</span></th>`}).join('')+'<th style="width:90px">הקלטה</th></tr>';
   qs('drill-tbody').innerHTML=pageRows.length
-    ?pageRows.map((r,i)=>`<tr><td class="idx" data-label="#">${start+i+1}</td>${_columns.map(c=>{
-        const v=cellVal(r,c);
-        const cls=(c.toLowerCase().includes('phone')||c==='Folder')?'phone':'';
-        return`<td class="${cls}" data-label="${esc(colLabel(c))}">${esc(v)}</td>`
-      }).join('')}</tr>`).join('')
-    :`<tr><td colspan="${_columns.length+1}" style="text-align:center;padding:30px;color:var(--muted)">אין תוצאות</td></tr>`;
+    ?pageRows.map((r,i)=>{
+        const cells=_columns.map(c=>{
+          const v=cellVal(r,c);
+          const cls=(c.toLowerCase().includes('phone')||c==='Folder')?'phone':'';
+          return`<td class="${cls}" data-label="${esc(colLabel(c))}">${esc(v)}</td>`
+        }).join('');
+        const recRef=findRecordingRef(r);
+        const recCell=recRef
+          ?`<td data-label="הקלטה"><button class="btn-refresh" style="color:var(--accent);background:var(--accent-dim);border-color:#93C5FD" onclick="playRecording('${recRef.replace(/'/g,"\\'")}',this)">🔊 השמע</button></td>`
+          :`<td data-label="הקלטה">—</td>`;
+        return`<tr><td class="idx" data-label="#">${start+i+1}</td>${cells}${recCell}</tr>`;
+      }).join('')
+    :`<tr><td colspan="${_columns.length+2}" style="text-align:center;padding:30px;color:var(--muted)">אין תוצאות</td></tr>`;
   qs('list-info').textContent=`${total.toLocaleString('he')} רשומות`;
   qs('page-info').textContent=`עמוד ${_drillPage} / ${pages}`;
   const b=[`<button onclick="goPage(${_drillPage-1})" ${_drillPage<=1?'disabled':''}>›</button>`];
@@ -670,16 +604,17 @@ function renderDrillTable(){
 function goPage(p){_drillPage=p;renderDrillTable()}
 function sortDrill(col){if(_drillSort===col)_drillSortAsc=!_drillSortAsc;else{_drillSort=col;_drillSortAsc=true}renderDrillTable()}
 function drillAll(){
-  _activeCity='__all__';_activeNbhd=null;_activeRamot=null;_drillPage=1;_drillSort=null;_drillSortAsc=true;
+  _activeCity='__all__';_drillPage=1;_drillSort=null;_drillSortAsc=true;
   qs('search-in').value='';
+  const seats=_records.reduce((s,r)=>s+(parseInt(r[QTY_KEY],10)||0),0);
   qs('drill-title').textContent='כל הרשומות';
-  qs('drill-count').textContent=`${_records.length.toLocaleString('he')} רשומות`;
+  qs('drill-count').textContent=`${seats.toLocaleString('he')} מקומות · ${_records.length.toLocaleString('he')} הזמנות`;
   qs('nbhd-section').hidden=true;
   qs('ramot-section').hidden=true;
   qs('view-dashboard').hidden=true;qs('view-city').hidden=false;
   _drillFiltered=_records;renderDrillTable();
 }
-function backToDash(){_activeCity=null;_activeNbhd=null;qs('view-city').hidden=true;qs('view-dashboard').hidden=false}
+function backToDash(){_activeCity=null;qs('view-city').hidden=true;qs('view-dashboard').hidden=false}
 
 function exportCSV(){
   const e2=v=>'"'+String(v).replace(/"/g,'""')+'"';
