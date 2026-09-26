@@ -1,1253 +1,727 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="he">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>מערכת ניהול ימות המשיח</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
-  <style>
-    .bg-opacity-50 { --tw-bg-opacity: 0.5; }</style>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Heebo', Arial, sans-serif; }
-    .spin { animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .fade-in { animation: fadeIn .25s ease; }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(-8px); } to { opacity:1; transform:translateY(0); } }
-    .slide-down { animation: slideDown .3s ease; }
-    @keyframes slideDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
-    th.sortable:hover { background:#e5e7eb; cursor:pointer; }
-    /* Mobile table: tighter cells */
-    @media (max-width: 640px) {
-      #tbl-head th, #tbl-body td { padding: 8px 10px; font-size: 0.72rem; }
-    }
-    /* Ensure minimum touch-target size */
-    .touch-btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>רישום הסעות ישיבת תפרח</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700;800&display=swap">
+<style>
+:root{--navy:#1A3555;--navy-mid:#22477A;--accent:#2563EB;--accent-dim:#DBEAFE;--sky:#F0F6FF;--white:#FFFFFF;--g50:#F8FAFC;--g100:#F1F5F9;--g200:#E2E8F0;--g600:#475569;--g900:#0F172A;--green:#166534;--green-bg:#DCFCE7;--red:#991B1B;--red-bg:#FEE2E2;--amber:#92400E;--amber-bg:#FEF3C7;--bg:var(--sky);--surface:var(--white);--text:var(--g900);--muted:var(--g600);--border:var(--g200)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0B1829;--surface:#112240;--text:#CBD5E0;--muted:#64748B;--border:#1E3A5C;--sky:#0B1829;--g50:#0D1B2E;--g100:#112240;--g200:#1E3A5C;--white:#112240;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0B1829;--surface:#112240;--text:#CBD5E0;--muted:#64748B;--border:#1E3A5C;--sky:#0B1829;--g50:#0D1B2E;--g100:#112240;--g200:#1E3A5C;--white:#112240;color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font-family:'Assistant',system-ui,sans-serif;background:var(--bg);color:var(--text);direction:rtl;font-size:15px;line-height:1.5}
+#top-bar{background:linear-gradient(135deg,var(--navy),var(--navy-mid));color:#fff;position:sticky;top:0;z-index:200;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.bar-inner{max-width:1400px;margin:0 auto;padding:0 20px;height:54px;display:flex;align-items:center;gap:12px}
+.brand{font-size:17px;font-weight:800;flex:0 0 auto}
+.brand small{font-size:12px;font-weight:400;opacity:.65;margin-right:6px}
+.bar-center{flex:1;display:flex;align-items:center;justify-content:center}
+#refresh-bar{display:flex;align-items:center;gap:8px;font-size:13px;opacity:.85}
+#countdown-ring{width:30px;height:30px;flex-shrink:0}
+#countdown-ring svg{transform:rotate(-90deg)}
+#ring-bg{fill:none;stroke:rgba(255,255,255,.25);stroke-width:3}
+#ring-fg{fill:none;stroke:#7DD3FC;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .9s linear;stroke-dasharray:75.4}
+.bar-end{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.dot{width:8px;height:8px;border-radius:50%}
+.dot.gray{background:#94A3B8}.dot.pulse{background:#FCD34D;animation:blink .8s infinite alternate}
+.dot.ok{background:#6EE7B7}.dot.err{background:#FCA5A5}
+@keyframes blink{to{opacity:.3}}
+#status-lbl{font-size:13px;opacity:.8}
+.btn-refresh{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 12px;border-radius:20px;font-size:12px;font-family:inherit;cursor:pointer}
+.btn-refresh:hover{background:rgba(255,255,255,.25)}
+#body{max-width:1400px;margin:0 auto;padding:16px 16px 48px;display:flex;flex-direction:column;gap:14px}
+.alert{padding:12px 16px;border-radius:10px;font-size:14px;display:flex;gap:10px;align-items:flex-start}
+.alert.info{background:var(--accent-dim);color:#1E40AF;border:1px solid #93C5FD}
+.alert.success{background:var(--green-bg);color:var(--green);border:1px solid #86EFAC}
+.alert.warning{background:var(--amber-bg);color:var(--amber);border:1px solid #FCD34D}
+.alert.error{background:var(--red-bg);color:var(--red);border:1px solid #FCA5A5}
+.alert strong{display:block;margin-bottom:2px}
+code{background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px;font-size:12px}
+#cfg-warn{background:var(--amber-bg);color:var(--amber);border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;font-size:14px}
+#cfg-warn strong{display:block;margin-bottom:4px}
+.section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px;flex-wrap:wrap}
+.section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0}
+.section-meta{font-size:13px;color:var(--muted)}
+#city-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.city-card{border-radius:12px;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s;position:relative;overflow:hidden;border:2px solid transparent}
+.city-card:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.city-card:active{transform:scale(.97)}
+.city-count{font-size:28px;font-weight:800;line-height:1;margin-bottom:4px}
+.city-name{font-size:13px;font-weight:600;opacity:.85;word-break:break-word}
+.city-pct{position:absolute;bottom:6px;left:10px;font-size:11px;opacity:.55}
+.bar-bg{position:absolute;bottom:0;left:0;right:0;height:4px;background:rgba(255,255,255,.25)}
+.bar-fill{position:absolute;bottom:0;left:0;height:4px;background:rgba(255,255,255,.6);border-radius:0 2px 2px 0}
+.cc0{background:#2563EB;color:#fff}.cc1{background:#7C3AED;color:#fff}.cc2{background:#DB2777;color:#fff}
+.cc3{background:#DC2626;color:#fff}.cc4{background:#D97706;color:#fff}.cc5{background:#059669;color:#fff}
+.cc6{background:#0891B2;color:#fff}.cc7{background:#4338CA;color:#fff}.cc8{background:#BE185D;color:#fff}
+.cc9{background:#92400E;color:#fff}.cc10{background:#047857;color:#fff}.cc11{background:#0E7490;color:#fff}
+.city-card-total{background:var(--g100);color:var(--text);border:2px solid var(--border);cursor:default}
+.city-card-total:hover{transform:none;box-shadow:none}
+#drill-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.btn-back{display:flex;align-items:center;gap:6px;background:var(--g100);border:1.5px solid var(--border);color:var(--text);padding:7px 14px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.btn-back:hover{background:var(--g200)}
+.drill-title{font-size:19px;font-weight:800;flex:1}
+.drill-count{font-size:13px;color:var(--muted)}
+#nbhd-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.nbhd-chip{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:var(--g100);border:1.5px solid var(--border);font-size:13px;cursor:pointer;white-space:nowrap}
+.nbhd-chip:hover{background:var(--g200)}
+.nbhd-chip .n-count{font-weight:700;color:var(--accent)}
+.nbhd-chip.active{background:var(--accent-dim);border-color:#93C5FD;color:#1E40AF}
+.nbhd-chip.active .n-count{color:#1E40AF}
+.search-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.search-box{position:relative;flex:1;min-width:160px}
+.search-box input{width:100%;height:36px;padding:0 36px 0 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit;font-size:14px;direction:rtl;outline:none}
+.search-box input:focus{border-color:var(--accent)}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.tbl-info{font-size:13px;color:var(--muted)}
+.btn-export{background:var(--accent-dim);color:var(--accent);border:1.5px solid #93C5FD;padding:6px 14px;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.btn-export:hover{background:#BFDBFE}
+.tbl-wrap{overflow-x:auto;margin:0 -20px;padding:0 20px}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:500px}
+thead th{background:var(--g50);padding:9px 12px;text-align:right;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);white-space:nowrap;border-bottom:1.5px solid var(--border);cursor:pointer;user-select:none}
+thead th:hover{color:var(--text)}
+.sort-ico{margin-right:3px;font-size:9px;opacity:.5}
+thead th.sorted .sort-ico{opacity:1}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--g50)}
+tbody td{padding:8px 12px;vertical-align:middle;font-variant-numeric:tabular-nums}
+tbody td.phone{direction:ltr;text-align:right;font-family:'Courier New',monospace;font-size:13px;color:var(--muted)}
+tbody td.idx{color:var(--muted);font-size:12px;text-align:left}
+.pager{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:13px;color:var(--muted)}
+.pager-btns{display:flex;gap:4px}
+.pager-btns button{width:30px;height:30px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:inherit;font-size:13px;cursor:pointer}
+.pager-btns button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.pager-btns button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pager-btns button:disabled{opacity:.3;cursor:not-allowed}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty .ico{font-size:40px;margin-bottom:8px}
+/* ══════════ מובייל ══════════ */
+@media(max-width:640px){
+  /* סרגל עליון */
+  .bar-inner{padding:0 12px;height:50px;gap:8px}
+  .brand{font-size:14px}
+  #refresh-label{display:none}
+  #countdown-ring{width:26px;height:26px}
+  #status-lbl{display:none}
+  .btn-refresh{padding:4px 9px;font-size:11px}
+  /* גוף */
+  #body{padding:10px 10px 80px;gap:10px}
+  .section{padding:12px 12px;border-radius:12px}
+  .section-head{margin-bottom:10px}
+  .section-title{font-size:11px}
+  /* כרטיסי ערים */
+  #city-grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  #nbhd-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+  .city-count{font-size:26px}
+  .city-name{font-size:12px}
+  /* כפתור חזרה בתחתית (sticky) */
+  .btn-back{position:fixed;bottom:16px;right:16px;z-index:300;box-shadow:0 4px 16px rgba(0,0,0,.25);border-radius:24px;padding:10px 20px;font-size:15px;background:var(--navy);color:#fff;border-color:transparent}
+  /* כותרת drill */
+  #drill-header{flex-direction:row-reverse;justify-content:flex-end}
+  .drill-title{font-size:17px}
+  /* טבלה — כרטיסים במקום שורות */
+  table,thead,tbody,th,td,tr{display:block}
+  thead tr{position:absolute;top:-9999px;right:-9999px}
+  tbody tr{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;padding:10px 12px;background:var(--surface)}
+  tbody tr:hover{background:var(--g50)}
+  tbody td{border:none;padding:3px 0;font-size:13px;display:flex;gap:6px;align-items:baseline}
+  tbody td::before{content:attr(data-label);font-size:11px;color:var(--muted);font-weight:700;min-width:70px;flex-shrink:0}
+  tbody td.idx{display:none}
+  tbody td.phone{direction:ltr;justify-content:flex-end}
+  /* חיפוש + ייצוא */
+  .search-row{flex-direction:column;align-items:stretch}
+  .btn-export{width:100%;text-align:center}
+  /* עמודות */
+  .pager{flex-direction:column;align-items:center;gap:6px}
+  .pager-btns button{width:36px;height:36px;font-size:15px}
+  /* עוגה */
+  #pie-wrap,#nbhd-pie-wrap,#ramot-pie-wrap{flex-direction:column;align-items:center;gap:16px}
+  /* רמות */
+  #ramot-grid{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+}
+</style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body>
 
-<!-- ═══ HEADER ═══════════════════════════════════════════════════════ -->
-<header class="bg-blue-900 text-white shadow-lg">
-  <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2">
-    <div class="min-w-0 flex-1">
-      <h1 class="text-base sm:text-xl font-bold leading-tight truncate">📞 מערכת ניהול – ימות המשיח</h1>
-      <p class="text-blue-300 text-xs mt-0.5 truncate" id="nav-sub">לחץ "טען נתונים" להתחיל</p>
+<header id="top-bar">
+  <div class="bar-inner">
+    <div class="brand">🚌 <span>רישום הסעות ישיבת תפרח</span></div>
+    <div class="bar-center">
+      <div id="refresh-bar">
+        <div id="countdown-ring"><svg width="30" height="30" viewBox="0 0 30 30"><circle id="ring-bg" cx="15" cy="15" r="12"/><circle id="ring-fg" cx="15" cy="15" r="12" stroke-dashoffset="0"/></svg></div>
+        <span id="refresh-label">ריענון עוד <b id="cd-num">10</b> שנ'</span>
+        <button class="btn-refresh" onclick="togglePause()" id="btn-pause">⏸ השהה</button>
+        <button class="btn-refresh" onclick="manualRefresh()">🔄 רענן</button>
+      </div>
     </div>
-    <div class="flex gap-2 flex-shrink-0">
-      <button onclick="doRefresh()"
-        class="touch-btn bg-blue-700 hover:bg-blue-600 text-white text-sm px-3 py-2 rounded-lg gap-1 transition">
-        <span>🔄</span><span class="hidden sm:inline">רענן</span>
-      </button>
-      <button id="lock-btn" onclick="toggleCrudLock()"
-        class="touch-btn text-sm px-3 py-2 rounded-lg gap-1 transition bg-red-800 hover:bg-red-700 text-white">
-        <span id="lock-icon">🔒</span><span class="hidden sm:inline" id="lock-label">נעול</span>
-      </button>
-      <button onclick="openSettings()"
-        class="touch-btn bg-white text-blue-900 hover:bg-blue-50 text-sm font-semibold px-3 py-2 rounded-lg gap-1 transition">
-        <span>⚙️</span><span class="hidden sm:inline">הגדרות</span>
-      </button>
-    </div>
+    <div class="bar-end"><span id="dot" class="dot gray"></span><span id="status-lbl">לא מחובר</span></div>
   </div>
 </header>
 
-<!-- ═══ MAIN ══════════════════════════════════════════════════════════ -->
-<main class="max-w-7xl mx-auto px-4 py-6 space-y-4">
+<div id="body">
+  <div id="cfg-warn" hidden style="background:var(--amber-bg);color:var(--amber);border:1px solid #FCD34D;border-radius:10px;padding:12px 16px;font-size:14px"><strong>⚙️ עדכן פרטי כניסה</strong> ערוך את הקובץ ועדכן <code>sysNum</code> ו-<code>password</code>.</div>
 
-  <!-- Alert -->
-  <div id="alert" class="hidden fade-in"></div>
-
-  <!-- New rows notification banner -->
-  <div id="new-rows-banner" class="hidden slide-down bg-blue-600 text-white px-4 py-3 rounded-xl flex items-center justify-between gap-3">
-    <div class="flex items-center gap-2 min-w-0">
-      <span class="text-lg flex-shrink-0">🔔</span>
-      <span class="text-sm">יש <strong id="new-rows-count">0</strong> שורות חדשות מאז הטעינה האחרונה</span>
+  <div id="view-dashboard">
+    <div class="section">
+      <div class="section-head"><span class="section-title">סיכום לפי ערים</span><span id="dash-meta" class="section-meta"></span></div>
+      <div id="city-grid"><div class="empty"><div class="ico">🏙️</div><p>טוען נתונים…</p></div></div>
     </div>
-    <button onclick="applyPendingData()"
-      class="touch-btn flex-shrink-0 bg-white text-blue-600 text-sm font-bold px-4 py-1.5 rounded-lg hover:bg-blue-50 transition whitespace-nowrap">
-      רענן עכשיו
-    </button>
-  </div>
-
-  <!-- Stats Cards -->
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-blue-500">
-      <p class="text-gray-500 text-xs mb-1">סה"כ רשומות</p>
-      <p class="text-3xl font-bold text-blue-600" id="s-total">—</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-green-500">
-      <p class="text-gray-500 text-xs mb-1">היום</p>
-      <p class="text-3xl font-bold text-green-600" id="s-today">—</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-yellow-500">
-      <p class="text-gray-500 text-xs mb-1">השבוע</p>
-      <p class="text-3xl font-bold text-yellow-600" id="s-week">—</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm p-4 border-r-4 border-purple-500">
-      <p class="text-gray-500 text-xs mb-1">החודש</p>
-      <p class="text-3xl font-bold text-purple-600" id="s-month">—</p>
+    <div class="section" id="pie-section" hidden>
+      <div class="section-head"><span class="section-title">התפלגות לפי עיר</span></div>
+      <div id="pie-wrap" style="display:flex;align-items:center;gap:32px;flex-wrap:wrap"></div>
     </div>
   </div>
 
-  <!-- Pivot cards -->
-  <div id="pivot-section" class="hidden">
-    <div id="pivot-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-  </div>
-
-  <!-- Controls -->
-  <div class="bg-white rounded-xl shadow-sm p-3 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2 sm:gap-3">
-    <input id="search" type="text" placeholder="🔍 חיפוש בכל השדות..."
-      oninput="onSearch(this.value)"
-      class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-    <div class="flex gap-2">
-      <select id="page-size" onchange="onPageSize(this.value)"
-        class="flex-1 sm:flex-none touch-btn border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-        <option value="25">25 שורות</option>
-        <option value="50">50 שורות</option>
-        <option value="100">100 שורות</option>
-        <option value="0">הכל</option>
-      </select>
-      <button onclick="doExport()"
-        class="flex-1 sm:flex-none touch-btn bg-green-600 hover:bg-green-700 text-white text-sm px-4 py-2 rounded-lg gap-1 transition">
-        ⬇️ <span class="hidden sm:inline">ייצוא</span> CSV
-      </button>
-      <button id="add-row-btn" onclick="openAddRow()" class="hidden flex-1 sm:flex-none touch-btn bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg gap-1 transition">
-        ➕ <span class="hidden sm:inline">הוסף</span> שורה
-      </button>
-    </div>
-    <span id="rec-count" class="text-xs text-gray-500"></span>
-  </div>
-
-  <!-- Table card -->
-  <div class="bg-white rounded-xl shadow-sm overflow-hidden">
-
-    <!-- Loading -->
-    <div id="state-loading" class="hidden py-20 text-center">
-      <div class="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full spin mb-3"></div>
-      <p class="text-gray-400 text-sm">טוען נתונים מימות המשיח...</p>
-    </div>
-
-    <!-- Empty -->
-    <div id="state-empty" class="py-20 text-center">
-      <p class="text-5xl mb-3">📋</p>
-      <p class="text-gray-500 font-medium">אין נתונים להצגה</p>
-      <p class="text-gray-400 text-sm mt-1">הגדר פרטי חיבור ולחץ "טען נתונים"</p>
-      <button onclick="openSettings()"
-        class="mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm px-5 py-2 rounded-lg transition">
-        פתח הגדרות
-      </button>
-    </div>
-
-    <!-- Table -->
-    <div id="state-table" class="hidden overflow-x-auto">
-      <table class="w-full text-sm">
-        <thead id="tbl-head"></thead>
-        <tbody id="tbl-body"></tbody>
-      </table>
-    </div>
-
-  </div>
-
-  <!-- Pagination -->
-  <div id="pagination" class="hidden flex items-center justify-between flex-wrap gap-2">
-    <span id="page-info" class="text-sm text-gray-500"></span>
-    <div id="page-btns" class="flex gap-1"></div>
-  </div>
-
-</main>
-
-<!-- ═══ SETTINGS MODAL (3-step wizard) ══════════════════════════════ -->
-<div id="modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg fade-in flex flex-col" style="max-height:90vh">
-
-    <!-- Header -->
-    <div class="bg-blue-900 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
-      <h2 class="font-bold text-lg">⚙️ הגדרות חיבור</h2>
-      <button onclick="closeSettings()" class="text-blue-200 hover:text-white text-2xl leading-none">✕</button>
-    </div>
-
-    <!-- Step indicators -->
-    <div class="flex items-center justify-center gap-3 py-4 border-b flex-shrink-0 bg-gray-50">
-      <div id="ind-1" class="flex items-center gap-1.5">
-        <div id="ind-1-num" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-blue-600 text-white">1</div>
-        <span id="ind-1-lbl" class="text-xs font-medium text-blue-700">מפתח API</span>
-      </div>
-      <div class="w-10 h-px bg-gray-300"></div>
-      <div id="ind-2" class="flex items-center gap-1.5">
-        <div id="ind-2-num" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400">2</div>
-        <span id="ind-2-lbl" class="text-xs text-gray-400">שלוחה וקובץ</span>
-      </div>
-      <div class="w-10 h-px bg-gray-300"></div>
-      <div id="ind-3" class="flex items-center gap-1.5">
-        <div id="ind-3-num" class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400">3</div>
-        <span id="ind-3-lbl" class="text-xs text-gray-400">אישור</span>
+  <div id="view-city" hidden>
+    <div class="section">
+      <div id="drill-header">
+        <button class="btn-back" onclick="backToDash()">← חזרה לסיכום</button>
+        <div><div class="drill-title" id="drill-title"></div><div class="drill-count" id="drill-count"></div></div>
       </div>
     </div>
-
-    <!-- Step content (scrollable) -->
-    <div class="overflow-y-auto flex-1 p-6">
-
-      <!-- ── Step 1: Token ── -->
-      <div id="wiz-step-1">
-        <p class="text-sm text-gray-500 mb-5">הכנס את מפתח ה-API של מערכת ימות המשיח ובדוק חיבור</p>
-        <label class="block text-sm font-semibold text-gray-700 mb-1">🔑 מפתח API (Token)</label>
-        <input id="m-apikey" type="text" placeholder="הדבק כאן את מפתח ה-API"
-          oninput="onTokenInput()"
-          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 mb-3">
-        <button onclick="doTestToken()" id="test-token-btn"
-          class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm px-5 py-2 rounded-lg transition" disabled>
-          🔗 בדוק חיבור
-        </button>
-        <div id="token-status" class="mt-3 text-sm"></div>
-      </div>
-
-      <!-- ── Step 2: Extension + Files ── -->
-      <div id="wiz-step-2" class="hidden">
-        <p class="text-sm text-gray-500 mb-4">הכנס מספר שלוחה ושם קובץ</p>
-
-        <!-- Extension -->
-        <label class="block text-sm font-semibold text-gray-700 mb-1">📞 מספר שלוחה</label>
-        <div class="flex gap-2 mb-4">
-          <input id="m-ext" type="text" placeholder="לדוגמה: 5  או  2/1"
-            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-          <button onclick="doSearchFiles()" id="search-files-btn"
-            class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm px-3 py-2 rounded-lg transition flex items-center gap-1 whitespace-nowrap">
-            <span id="search-files-icon">🔍</span>
-            <span id="search-files-label">חפש קבצים</span>
-          </button>
-        </div>
-
-        <!-- Manual filename (always visible) -->
-        <label class="block text-sm font-semibold text-gray-700 mb-1">📄 שם קובץ</label>
-        <div class="flex gap-2 mb-1">
-          <input id="manual-filename" type="text" placeholder="ApprovalAll.ymgr"
-            class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300">
-          <button onclick="selectManualFile()"
-            class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-2 rounded-lg transition whitespace-nowrap">
-            בחר
-          </button>
-        </div>
-        <p class="text-xs text-gray-400 mb-3">הזן ידנית או השתמש בכפתור חיפוש למעלה</p>
-
-        <!-- Found files list -->
-        <div id="files-found" class="hidden mt-2">
-          <p class="text-xs font-semibold text-gray-500 mb-2">קבצים שנמצאו — לחץ לבחירה:</p>
-          <div id="files-list" class="space-y-2 max-h-40 overflow-y-auto"></div>
-        </div>
-
-        <!-- Debug info -->
-        <div id="files-debug" class="hidden mt-3"></div>
-      </div>
-
-      <!-- ── Step 3: Confirm ── -->
-      <div id="wiz-step-3" class="hidden">
-        <p class="text-sm text-gray-500 mb-4">אשר את פרטי החיבור ולחץ "שמור וטען"</p>
-
-        <!-- Lock toggle -->
-        <div class="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
-          <div class="min-w-0 pr-3">
-            <p class="text-sm font-semibold text-amber-800">🔒 נעילת עריכת נתונים</p>
-            <p class="text-xs text-amber-600 mt-0.5">כשנעול — כפתורי עריכה/מחיקה/הוספה מושבתים</p>
-          </div>
-          <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
-            <input type="checkbox" id="crud-lock-toggle" class="sr-only peer" checked>
-            <div class="w-11 h-6 bg-gray-300 rounded-full peer
-              peer-checked:bg-red-600
-              after:content-[''] after:absolute after:top-[2px] after:right-[2px]
-              after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all
-              peer-checked:after:translate-x-[-20px]"></div>
-          </label>
-        </div>
-
-        <div class="space-y-2 mb-5">
-          <div class="bg-gray-50 rounded-lg px-4 py-3 flex justify-between items-center">
-            <span class="text-xs text-gray-500">מפתח API</span>
-            <span id="confirm-token" class="text-sm font-mono text-gray-700 max-w-xs truncate"></span>
-          </div>
-          <div class="bg-gray-50 rounded-lg px-4 py-3 flex justify-between items-center">
-            <span class="text-xs text-gray-500">שלוחה</span>
-            <span id="confirm-ext" class="text-sm font-semibold text-blue-700"></span>
-          </div>
-          <div class="bg-gray-50 rounded-lg px-4 py-3 flex justify-between items-center">
-            <span class="text-xs text-gray-500">קובץ</span>
-            <span id="confirm-file" class="text-sm font-mono font-semibold text-blue-700"></span>
-          </div>
-          <div class="bg-blue-50 rounded-lg px-4 py-3 flex justify-between items-center">
-            <span class="text-xs text-gray-500">נתיב מלא</span>
-            <code id="confirm-path" class="text-xs text-blue-700 font-bold"></code>
-          </div>
-        </div>
-        <!-- Column labels (shown after data already loaded) -->
-        <div id="col-section" class="hidden border-t pt-4">
-          <p class="text-sm font-semibold text-gray-700 mb-1">שמות עמודות לתצוגה</p>
-          <p class="text-xs text-gray-400 mb-3">ניתן לשנות את שם התצוגה לכל עמודה.</p>
-          <div id="col-inputs" class="space-y-2 max-h-40 overflow-y-auto pr-1"></div>
-        </div>
-
-        <!-- Pivot configuration (shown after data loaded) -->
-        <div id="pivot-cfg-section" class="hidden border-t pt-4 mt-2">
-          <div class="flex items-center justify-between mb-1">
-            <p class="text-sm font-semibold text-gray-700">📊 פילוחי נתונים</p>
-            <button type="button" onclick="addPivotRow()"
-              class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-lg transition">+ הוסף פילוח</button>
-          </div>
-          <p class="text-xs text-gray-400 mb-3">בחר עמודה — יוצג בראש העמוד כמה פעמים מופיע כל ערך.</p>
-          <div id="pivot-rows" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
-        </div>
-      </div>
-
+    <div class="section" id="nbhd-section" hidden>
+      <div class="section-head"><span class="section-title">סיכום לפי שכונות</span><span id="nbhd-meta" class="section-meta"></span></div>
+      <div id="nbhd-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px"></div>
+      <div id="nbhd-pie-wrap" style="display:flex;align-items:center;gap:32px;flex-wrap:wrap"></div>
     </div>
-
-    <!-- Footer (dynamic) -->
-    <div id="modal-footer" class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t flex-shrink-0"></div>
-
-  </div>
-</div>
-
-<!-- ═══ CRUD MODAL ═══════════════════════════════════════════════════ -->
-<div id="crud-modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-start justify-center p-4 overflow-y-auto">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg fade-in my-4 flex flex-col">
-    <div class="bg-blue-900 text-white px-6 py-4 rounded-t-2xl flex items-center justify-between flex-shrink-0">
-      <h2 id="crud-title" class="font-bold text-lg"></h2>
-      <button onclick="closeCrudModal()" class="text-blue-200 hover:text-white text-2xl leading-none">✕</button>
+    <div class="section" id="ramot-section" hidden>
+      <div class="section-head"><span class="section-title">📍 בתוך רמות</span><span id="ramot-meta" class="section-meta"></span></div>
+      <div id="ramot-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:18px"></div>
+      <div id="ramot-pie-wrap" style="display:flex;align-items:center;gap:32px;flex-wrap:wrap"></div>
     </div>
-    <div id="crud-body" class="p-6 overflow-y-auto flex-1" style="max-height:65vh"></div>
-    <div class="px-6 py-4 bg-gray-50 rounded-b-2xl border-t flex-shrink-0 flex justify-between items-center gap-3">
-      <button onclick="closeCrudModal()" class="text-sm text-gray-500 hover:text-gray-700">ביטול</button>
-      <div id="crud-submit-area"></div>
+    <div class="section">
+      <div class="section-head"><span class="section-title">רשימת רשומות</span></div>
+      <div class="search-row">
+        <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="search-in" placeholder="חיפוש…" oninput="applyDrillFilter()"></div>
+        <span id="list-info" class="tbl-info"></span>
+        <button class="btn-export" onclick="exportCSV()">⬇ ייצא CSV</button>
+      </div>
+      <div class="tbl-wrap"><table><thead id="drill-thead"></thead><tbody id="drill-tbody"></tbody></table></div>
+      <div class="pager"><span id="page-info"></span><div class="pager-btns" id="page-btns"></div></div>
     </div>
   </div>
 </div>
 
-<!-- ═══ DELETE CONFIRM MODAL ═══════════════════════════════════════ -->
-<div id="del-modal" class="hidden fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm fade-in p-6 text-center">
-    <p class="text-4xl mb-3">🗑️</p>
-    <h3 class="font-bold text-gray-800 text-lg mb-2">מחיקת שורה</h3>
-    <p class="text-sm text-gray-500 mb-4">פעולה זו בלתי הפיכה. האם למחוק את השורה?</p>
-    <div id="del-preview" class="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 mb-5 text-right max-h-24 overflow-y-auto leading-relaxed"></div>
-    <div class="flex gap-3">
-      <button onclick="closeDelModal()"
-        class="flex-1 border border-gray-300 text-gray-600 py-2.5 rounded-lg text-sm hover:bg-gray-50 transition">ביטול</button>
-      <button id="del-confirm-btn" onclick="confirmDelete()"
-        class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-lg text-sm font-semibold transition">מחק</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ SCRIPT ════════════════════════════════════════════════════════ -->
 <script>
-// ── State ──────────────────────────────────────────────────────────────
-let cfg = loadCfg();
-let allRows = [];       // raw rows from API
-let headers = [];       // column names
-let filtered = [];      // after search/sort
-let sortCol = '';
-let sortDir = 'asc';
-let page = 1;
-let perPage = 25;
-let search = '';
-// Auto-refresh
-let pendingNewRows = null;
-let pendingNewData = null;
-let autoRefreshTimer = null;
-const AUTO_REFRESH_MS = 60000; // check every 60 seconds
-// CRUD
-let crudContentHash = '';
-let pendingDeleteRow = null;
+// ════════════════════════════════════════════
+//  שנה כאן את פרטי הכניסה
+// ════════════════════════════════════════════
+const CONFIG={
+  sysNum:   '033050999',
+  password: '556778',
+  folder:   '2/1',     // שלוחה
+  refreshSec: 10
+};
+// ════════════════════════════════════════════
+// מיפוי שדות מ-ApprovalAll.ini
+// ════════════════════════════════════════════
+const FIELD_LABELS={
+  'P050': 'עיר',
+  'P051': 'שכונה',
+  'P052': 'בתוך רמות'
+};
+// ערים: P050+N
+const CITY_MAP={
+  '1':'ירושלים','2':'בני ברק','3':'בית שמש',
+  '4':'מודיעין עילית','5':'ביתר','6':'אלעד'
+};
+// שכונות: P051+N
+const NBHD_MAP={
+  '1':'רמת שלמה','2':'נווה יעקב','3':'גבעת שאול',
+  '4':'הר נוף','5':'בית וגן','6':'יקירי ירושלים',
+  '7':'שכונות הצפון','8':'סנהדריה, סנהדריה מורחבת ורמת אשכול',
+  '9':'בר אילן שמואל הנביא','0':'רמות'
+};
+// בתוך רמות: P052+N
+const RAMOT_MAP={
+  '1':'רמות א','2':'רמות ב','3':'רמות ג',
+  '4':'רמות ד','5':'רמות פולין'
+};
 
-// ── Config (localStorage) ──────────────────────────────────────────────
-function loadCfg() {
-  try { return JSON.parse(localStorage.getItem('ym_cfg') || '{}'); } catch { return {}; }
+const API='https://private.call2all.co.il/ym/api/';
+let _token=null,_tokenAt=0,_records=[],_columns=[];
+// שדות קבועים לפי ApprovalAll.ini
+const CITY_KEY='P050';
+const NBHD_KEY='P051';
+let _activeCity=null,_activeNbhd=null,_drillFiltered=[],_drillPage=1;
+let _drillSort=null,_drillSortAsc=true,_timerInterval=null,_cdCount=CONFIG.refreshSec,_paused=false;
+const PAGE_SIZE=50;
+const COL_CLS=['cc0','cc1','cc2','cc3','cc4','cc5','cc6','cc7','cc8','cc9','cc10','cc11'];
+
+function qs(id){return document.getElementById(id)}
+function setStatus(cls,txt){qs('dot').className='dot '+cls;qs('status-lbl').textContent=txt}
+function showAlert(){}
+function clearAlert(){}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function credsOK(){return CONFIG.sysNum!=='XXXXX'&&CONFIG.password!=='YYYYY'}
+
+// תרגום ערכים מספריים לשמות
+function cityLabel(v){return CITY_MAP[String(v)]||'(לא ידוע)'}
+function nbhdLabel(v){return NBHD_MAP[String(v)]||'(לא ידוע)'}
+function ramotLabel(v){return RAMOT_MAP[String(v)]||''}
+
+// תרגום שמות עמודות טכניות לעברית
+function colLabel(k){
+  if(FIELD_LABELS[k])return FIELD_LABELS[k];
+  const m={'ValName':'שם','Phone':'טלפון','Folder':'טלפון','phone':'טלפון','Date':'תאריך',
+    'EnterDate':'תאריך כניסה','ExitDate':'תאריך יציאה','Status':'סטטוס',
+    'Booking':'מספר הזמנה','DID':'מספר חייג','IncomingDID':'DID','var':'משתנה',
+    'Data':'נתונים','IdType':'סוג זיהוי','_period':'חודש','_path':'קובץ'};
+  return m[k]||k;
 }
-function saveCfg() { localStorage.setItem('ym_cfg', JSON.stringify(cfg)); }
 
-// ── API ────────────────────────────────────────────────────────────────
-async function fetchData() {
-  if (!cfg.apiKey)    throw new Error('מפתח API לא הוגדר');
-  if (!cfg.extension) throw new Error('מספר שלוחה לא הוגדר');
-  const r = await fetch('/api/get-data', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ token: cfg.apiKey, extension: cfg.extension, fileName: cfg.fileName || '' })
-  });
-  const d = await r.json();
-  if (!d.ok) {
-    // Show raw preview in a details block if available
-    const preview = d.rawPreview
-      ? `\n\nתוכן גולמי:\n${d.rawPreview}`
-      : '';
-    throw new Error((d.message || 'שגיאה בטעינת נתונים') + preview);
+async function ensureToken(){
+  if(_token&&Date.now()-_tokenAt<25*60*1000)return _token;
+  setStatus('pulse','מתחבר…');
+  let text;
+  try{
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),8000);
+    const res=await fetch(`${API}Login?username=${encodeURIComponent(CONFIG.sysNum)}&password=${encodeURIComponent(CONFIG.password)}`,{signal:ctrl.signal});
+    clearTimeout(tid);
+    text=await res.text();
+  }catch(e){
+    const msg=e.name==='AbortError'?'פג זמן ההמתנה לשרת (8 שנ\')':('שגיאת רשת/CORS: '+e.message);
+
+    qs('city-grid').innerHTML=`<div class="empty"><div class="ico">⏱️</div><p style="color:#DC2626">${msg}</p><p style="font-size:12px">ודא שהקובץ נפתח כ-file:// ולא מ-localhost</p></div>`;
+    throw new Error(msg);
   }
-  return d;
+  let tok=null;
+  try{const j=JSON.parse(text);if(j.token)tok=j.token;else if(j.responseStatus&&j.responseStatus!=='OK')throw new Error(j.message||text)}catch(e){if(e.message.includes('JSON')){}else throw e}
+  if(!tok){const m=text.match(/token[=:"]+([A-Za-z0-9+\/=_\-]{4,})/);if(m)tok=m[1]}
+  if(!tok)throw new Error('כניסה נכשלה: '+text.slice(0,150));
+  _token=tok;_tokenAt=Date.now();setStatus('ok','מחובר');return _token;
 }
 
-// ── Stats ──────────────────────────────────────────────────────────────
-function calcStats() {
-  document.getElementById('s-total').textContent = allRows.length.toLocaleString();
-  const datecol = headers.find(h => /תאריך|date|יום|time/i.test(h));
-  if (!datecol) { ['s-today','s-week','s-month'].forEach(id => document.getElementById(id).textContent = '—'); return; }
-  const now = new Date();
-  const d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const w0 = new Date(d0); w0.setDate(d0.getDate() - d0.getDay());
-  const m0 = new Date(now.getFullYear(), now.getMonth(), 1);
-  let td=0, wk=0, mo=0;
-  allRows.forEach(r => {
-    const d = parseILDate(r[datecol]);
-    if (!d) return;
-    if (d >= d0) td++;
-    if (d >= w0) wk++;
-    if (d >= m0) mo++;
-  });
-  document.getElementById('s-today').textContent = td;
-  document.getElementById('s-week').textContent = wk;
-  document.getElementById('s-month').textContent = mo;
+async function downloadFile(path,timeoutMs=15000){
+  const tok=await ensureToken();
+  try{
+    const ctrl=new AbortController();
+    const tid=setTimeout(()=>ctrl.abort(),timeoutMs);
+    const r=await fetch(`${API}DownloadFile?token=${tok}&path=ivr2:${path}`,{signal:ctrl.signal});
+    clearTimeout(tid);
+    if(!r.ok)return null;
+    const t=await r.text();
+    return(t&&!t.includes('"responseStatus":"ERROR"'))?t:null;
+  }catch{return null}
 }
-
-function parseILDate(s) {
-  if (!s) return null;
-  let m;
-  m = String(s).match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{4})/);
-  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
-  m = String(s).match(/^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})/);
-  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
-  return null;
+async function getDir(path){
+  const tok=await ensureToken();
+  try{return parseDirText(await(await fetch(`${API}GetIVR2Dir?token=${tok}&path=ivr2:${path}`)).text())}
+  catch{return{folders:[],files:[]}}
 }
-
-// ── Render ─────────────────────────────────────────────────────────────
-function render() {
-  // filter
-  filtered = search
-    ? allRows.filter(r => headers.some(h => String(r[h]||'').toLowerCase().includes(search.toLowerCase())))
-    : [...allRows];
-
-  // sort
-  if (sortCol) {
-    filtered.sort((a, b) => {
-      const av = a[sortCol]||'', bv = b[sortCol]||'';
-      const an = parseFloat(av), bn = parseFloat(bv);
-      const cmp = !isNaN(an)&&!isNaN(bn) ? an-bn : av.localeCompare(bv,'he');
-      return sortDir==='asc' ? cmp : -cmp;
-    });
+function parseDirText(text){
+  if(!text||text.includes('"responseStatus":"ERROR"'))return{folders:[],files:[]};
+  try{
+    const j=JSON.parse(text);
+    if(j.files){return{
+      folders:j.files.filter(f=>f.isFolder||f.type==='d').map(f=>f.name||f),
+      files:j.files.filter(f=>!f.isFolder&&f.type!=='d').map(f=>f.name||f)
+    }}
+  }catch{}
+  const folders=[],files=[];
+  for(const line of text.split('\n')){
+    const t=line.trim();if(!t)continue;
+    if(t.includes('type=d')||t.endsWith('/'))folders.push(t.replace(/\/$|type=d.*$/,'').replace(/^name=/,'').trim());
+    else if(t.includes('.')||t.includes('type=f'))files.push(t.replace(/type=f.*$/,'').replace(/^name=/,'').trim());
+    else if(t.length>1)folders.push(t);
   }
-
-  renderTable();
-  renderPagination();
-  document.getElementById('rec-count').textContent =
-    filtered.length !== allRows.length
-      ? `${filtered.length.toLocaleString()} מתוך ${allRows.length.toLocaleString()} רשומות`
-      : `${allRows.length.toLocaleString()} רשומות`;
+  return{folders,files};
 }
 
-function renderTable() {
-  const labels = cfg.columnLabels || {};
-
-  // Header — actions column first
-  document.getElementById('tbl-head').innerHTML = '<tr class="border-b">' +
-    `<th class="px-2 py-3 text-center text-xs font-semibold text-gray-500 bg-gray-50 w-16">פעולות</th>` +
-    headers.map(h => {
-      const arrow = sortCol===h ? (sortDir==='asc'?' ▲':' ▼') : '';
-      return `<th onclick="doSort('${esc(h)}')"
-        class="sortable px-4 py-3 text-right font-semibold text-gray-600 bg-gray-50 whitespace-nowrap select-none">
-        ${esc(labels[h]||h)}${arrow}
-      </th>`;
-    }).join('') + '</tr>';
-
-  // Rows
-  const rows = perPage===0 ? filtered : filtered.slice((page-1)*perPage, page*perPage);
-  if (!rows.length) {
-    document.getElementById('tbl-body').innerHTML =
-      `<tr><td colspan="${headers.length + 1}" class="text-center py-12 text-gray-400">לא נמצאו רשומות</td></tr>`;
-    return;
-  }
-  const locked = isLocked();
-  document.getElementById('tbl-body').innerHTML = rows.map((r, i) => {
-    const aid = r['ApiCallId'] || '';
-    let editBtn, delBtn;
-    if (locked) {
-      editBtn = `<button disabled title="עריכה נעולה" class="opacity-20 cursor-not-allowed p-1 text-sm">🔒</button>`;
-      delBtn  = `<button disabled title="עריכה נעולה" class="opacity-20 cursor-not-allowed p-1 text-sm">🔒</button>`;
-    } else if (aid) {
-      editBtn = `<button onclick="openEditRow('${esc(aid)}')" title="עריכה" class="touch-btn text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded p-1 transition text-sm">✏️</button>`;
-      delBtn  = `<button onclick="openDeleteRow('${esc(aid)}')" title="מחיקה" class="touch-btn text-red-400 hover:text-red-600 hover:bg-red-50 rounded p-1 transition text-sm">🗑️</button>`;
-    } else {
-      editBtn = `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">✏️</button>`;
-      delBtn  = `<button disabled title="אין ApiCallId" class="opacity-25 cursor-not-allowed p-1 text-sm">🗑️</button>`;
+// פרסר ייעודי ל-ApprovalAll.ymgr
+// פורמט: Status#OK%Phone#05X%P050#1%ValName#שם
+function parseApprovalAll(text){
+  const recs=[];
+  for(const line of text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n')){
+    const tr=line.trim();if(!tr||tr.startsWith('{'))continue;
+    const rec={};
+    for(const part of tr.split('%')){
+      const i=part.indexOf('#');if(i<=0)continue;
+      const k=part.slice(0,i).trim(),v=part.slice(i+1).trim();
+      if(k)rec[k]=v;
     }
-    return `<tr class="${i%2===0?'bg-white':'bg-gray-50'} hover:bg-blue-50 transition-colors">` +
-      `<td class="px-2 py-2 border-b border-gray-100"><div class="flex gap-0.5 justify-center">${editBtn}${delBtn}</div></td>` +
-      headers.map(h => `<td class="px-4 py-3 text-gray-700 border-b border-gray-100 whitespace-nowrap">${esc(r[h]||'')}</td>`).join('') +
-      '</tr>';
-  }).join('');
+    if(Object.keys(rec).length>0)recs.push(rec);
+  }
+  return recs;
 }
 
-function renderPagination() {
-  const pag = document.getElementById('pagination');
-  if (!filtered.length || perPage===0) { pag.classList.add('hidden'); return; }
-  pag.classList.remove('hidden');
-  const totalPages = Math.ceil(filtered.length / perPage);
-  const s = (page-1)*perPage+1, e = Math.min(page*perPage, filtered.length);
-  document.getElementById('page-info').textContent = `מציג ${s}–${e} מתוך ${filtered.length.toLocaleString()}`;
-
-  const range = pageRange(page, totalPages);
-  document.getElementById('page-btns').innerHTML =
-    `<button onclick="goPage(${page-1})" ${page===1?'disabled':''} class="touch-btn min-w-[44px] px-3 rounded border text-sm ${page===1?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">‹</button>` +
-    range.map(p => p==='…'
-      ? `<span class="px-2 text-gray-400 self-center">…</span>`
-      : `<button onclick="goPage(${p})" class="touch-btn min-w-[44px] px-2 rounded border text-sm ${p===page?'bg-blue-600 text-white border-blue-600 font-medium':'hover:bg-gray-50'}">${p}</button>`
-    ).join('') +
-    `<button onclick="goPage(${page+1})" ${page===totalPages?'disabled':''} class="touch-btn min-w-[44px] px-3 rounded border text-sm ${page===totalPages?'text-gray-300 cursor-not-allowed':'hover:bg-gray-100'}">›</button>`;
+function parseYMGR(text){
+  const recs=[];
+  for(const line of text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n')){
+    const tr=line.trim();if(!tr||tr.startsWith('{'))continue;
+    const rec={};
+    for(const p of(tr.includes('\t')?tr.split('\t'):tr.split(' '))){
+      const i=p.indexOf('#');
+      if(i>0){
+        const k=p.slice(0,i).trim(),v=p.slice(i+1).trim();
+        if(!k)continue;
+        if(k.length<=12&&/^[A-Za-z0-9_]+$/.test(k)){
+          // שדה רגיל: Phone, Date, P050 וכו'
+          rec[k]=v;
+        } else if(k.length<80){
+          const combined=k+'#'+v;
+          // פורמט Log: P050%Log#2
+          for(const [,num,val] of combined.matchAll(/P0(\d{2,3})%Log#(\w+)/g)){rec[`P0${num}`]=val}
+          // פורמט Approval: %P050#1
+          for(const [,num,val] of combined.matchAll(/%P0(\d{2,3})#([^%\s]+)/g)){rec[`P0${num}`]=val}
+        }
+      }
+    }
+    if(Object.keys(rec).length>0)recs.push(rec);
+  }
+  return recs;
 }
 
-function pageRange(cur, tot) {
-  if (tot<=7) return Array.from({length:tot},(_,i)=>i+1);
-  const p=[1];
-  if (cur>3) p.push('…');
-  for(let i=Math.max(2,cur-1);i<=Math.min(tot-1,cur+1);i++) p.push(i);
-  if (cur<tot-2) p.push('…');
-  p.push(tot);
-  return p;
+function buildColumns(records){
+  const keys=[...new Set(records.flatMap(r=>Object.keys(r)))];
+  // עמודות מועדפות קודם
+  const prio=['ValName','Phone','Date',CITY_KEY,NBHD_KEY,'P052','Status','Booking'];
+  const hidden=['_path','_period','DID','IncomingDID','var','IdType','Data','Folder','HebrewDate','Time','EnterId','IdType'];
+  _columns=keys.filter(k=>!hidden.includes(k));
+  _columns.sort((a,b)=>{const ai=prio.indexOf(a),bi=prio.indexOf(b);
+    if(ai<0&&bi<0)return a.localeCompare(b,'he');if(ai<0)return 1;if(bi<0)return-1;return ai-bi});
 }
 
-// ── Event handlers ─────────────────────────────────────────────────────
-function doSort(col) {
-  sortDir = sortCol===col && sortDir==='asc' ? 'desc' : 'asc';
-  sortCol = col;
-  page = 1;
-  render();
-}
-function onSearch(v) { search=v; page=1; render(); }
-function onPageSize(v) { perPage=parseInt(v)||0; page=1; render(); }
-function goPage(p) {
-  const tot = Math.ceil(filtered.length/perPage);
-  if (p<1||p>tot) return;
-  page=p; render();
+// ערך מוצג של רשומה בעמודה (עם תרגום לעברית)
+function cellVal(rec,col){
+  const v=rec[col]??'';
+  if(col===CITY_KEY)return cityLabel(v);
+  if(col===NBHD_KEY)return nbhdLabel(v);
+  if(col==='P052')return ramotLabel(v);
+  return v;
 }
 
-function doExport() {
-  if (!filtered.length) { showAlert('warning','אין נתונים לייצוא'); return; }
-  const labels = cfg.columnLabels||{};
-  const hdr = headers.map(h=>`"${(labels[h]||h).replace(/"/g,'""')}"`).join(',');
-  const body = filtered.map(r =>
-    headers.map(h => { const v=String(r[h]||''); return /[,"\n]/.test(v)?`"${v.replace(/"/g,'""')}"`:`${v}`; }).join(',')
-  );
-  const csv = '\uFEFF'+[hdr,...body].join('\r\n');
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download = `yemot_${(cfg.extension||'data').replace(/\//g,'_')}_${new Date().toISOString().slice(0,10)}.csv`;
-  a.click();
-}
-
-// ── Main load ──────────────────────────────────────────────────────────
-async function doLoad() {
-  stopAutoRefresh();
-  hideBanner();
-  pendingNewRows = null;
-  pendingNewData = null;
-  setState('loading');
+async function loadData(){
+  if(!credsOK()){qs('cfg-warn').hidden=false;return}
   clearAlert();
-  try {
-    const d = await fetchData();
-    headers = d.headers;
-    allRows = d.rows;
-    if (d.contentHash) crudContentHash = d.contentHash;
-    calcStats();
-    search=''; page=1;
-    document.getElementById('search').value='';
-    setState('table');
-    render();
-    calcPivots();
-    applyLockState();
-    _updateNavSub();
-    showAlert('success',`נטענו ${allRows.length.toLocaleString()} רשומות בהצלחה ✅`);
-    startAutoRefresh();
-  } catch(e) {
-    setState('empty');
-    showAlert('error', e.message);
-  }
-}
 
-async function doRefresh() {
-  hideBanner();
-  pendingNewRows = null;
-  pendingNewData = null;
-  await doLoad();
-}
+  try{
+    const folder=CONFIG.folder;
+    let found=[];
 
-// ── Auto-refresh (silent background check) ────────────────────────────
-function startAutoRefresh() {
-  stopAutoRefresh();
-  autoRefreshTimer = setInterval(silentCheck, AUTO_REFRESH_MS);
-}
+    const setLoading=msg=>{
+      qs('city-grid').innerHTML=`<div class="empty"><div class="ico">⏳</div><p>${msg}</p></div>`;
+    };
 
-function stopAutoRefresh() {
-  if (autoRefreshTimer) { clearInterval(autoRefreshTimer); autoRefreshTimer = null; }
-}
-
-async function silentCheck() {
-  if (!cfg.apiKey || !cfg.extension || !allRows.length) return;
-  try {
-    const d = await fetchData();
-    const diff = d.rows.length - allRows.length;
-    if (diff > 0) {
-      pendingNewData = d;
-      pendingNewRows = diff;
-      document.getElementById('new-rows-count').textContent = diff.toLocaleString();
-      document.getElementById('new-rows-banner').classList.remove('hidden');
+    // ── ניסיון 1: ApprovalAll.ymgr — קובץ הרשמות (רשומה אחת לכל מתקשר) ──
+    setLoading('מוריד ApprovalAll.ymgr…');
+    const approvalPath=`${folder}/ApprovalAll.ymgr`;
+    const approvalText=await downloadFile(approvalPath,12000);
+    if(approvalText&&approvalText.trim().length>5&&!approvalText.trim().startsWith('<')){
+      setLoading('מפרסר ApprovalAll.ymgr…');
+      const firstLines=approvalText.split('\n').slice(0,5).join('\n');
+      console.log('ApprovalAll.ymgr raw:\n'+firstLines);
+      window._rawSample=firstLines; // שמור לתצוגה
+      const recs=parseApprovalAll(approvalText);
+      if(recs.length){recs.forEach(r=>{r._path=approvalPath});found.push(...recs)}
     }
-  } catch {} // silent — never disrupt user with background errors
-}
 
-function hideBanner() {
-  document.getElementById('new-rows-banner').classList.add('hidden');
-}
+    // ── ניסיון 2: אם לא מצאנו — טען LogRecordingAndEnteringData.ymgr ──
+    if(!found.length){
+      setLoading('מוריד LogRecordingAndEnteringData.ymgr…');
+      const logPath=`${folder}/LogRecordingAndEnteringData.ymgr`;
+      const logText=await downloadFile(logPath,30000);
+      if(logText&&logText.trim().length>5){
+        setLoading('מפרסר נתוני Log…');
+        const recs=parseYMGR(logText);
+        if(recs.length){recs.forEach(r=>{r._path=logPath});found.push(...recs)}
+      }
+    }
 
-function applyPendingData() {
-  if (!pendingNewData) return;
-  const d = pendingNewData;
-  pendingNewData = null;
-  pendingNewRows = null;
-  hideBanner();
-  headers = d.headers;
-  allRows = d.rows;
-  if (d.contentHash) crudContentHash = d.contentHash;
-  calcStats();
-  search = ''; page = 1;
-  document.getElementById('search').value = '';
-  render();
-  calcPivots();
-  applyLockState();
-  _updateNavSub();
-  showAlert('success', `עודכן ל-${allRows.length.toLocaleString()} רשומות ✅`);
-}
-
-function _updateNavSub() {
-  const file = cfg.fileName || 'ApprovalAll.ymgr';
-  document.getElementById('nav-sub').textContent =
-    `ivr2:${cfg.extension}/${file} · ${allRows.length.toLocaleString()} רשומות`;
-}
-
-// ── File browser ───────────────────────────────────────────────────────
-async function doSearchFiles() {
-  const btn   = document.getElementById('search-files-btn');
-  const icon  = document.getElementById('search-files-icon');
-  const label = document.getElementById('search-files-label');
-  const box   = document.getElementById('files-found');
-  const list  = document.getElementById('files-list');
-
-  const apiKey = document.getElementById('m-apikey').value.trim();
-  const ext    = document.getElementById('m-ext').value.trim();
-
-  if (!apiKey) { alert('הכנס מפתח API קודם'); return; }
-  if (!ext)    { alert('הכנס מספר שלוחה קודם'); return; }
-
-  btn.disabled = true;
-  icon.textContent = '⏳';
-  label.textContent = 'מחפש...';
-  box.classList.add('hidden');
-
-  try {
-    const r = await fetch('/api/list-files', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ token: apiKey, extension: ext })
-    });
-    const d = await r.json();
-
-    if (!d.ok) throw new Error(d.message || 'שגיאה בחיפוש קבצים');
-
-    // Show debug info from failed attempts
-    const dbg = document.getElementById('files-debug');
-    if (d.debug && d.debug.length) {
-      dbg.innerHTML = `<details><summary class="text-xs text-gray-400 cursor-pointer">תגובת שרת (debug)</summary>
-        ${d.debug.map(f => `<div class="text-xs bg-gray-50 rounded p-2 mt-1 font-mono break-all">${esc(f.fileName)}: ${esc(f.preview||'')}</div>`).join('')}
-      </details>`;
-      dbg.classList.remove('hidden');
+    // ── ניסיון 3: גלישת תיקייה ──
+    if(!found.length){
+      setLoading('מחפש קבצים בתיקייה…');
+      const{files}=await getDir(folder);
+      for(const f of files.filter(f=>f&&f.toLowerCase().endsWith('.ymgr'))){
+        setLoading(`מוריד ${f}…`);
+        const text=await downloadFile(`${folder}/${f}`);
+        if(text&&text.trim().length>5){
+          const recs=parseYMGR(text);
+          if(recs.length){recs.forEach(r=>{r._path=`${folder}/${f}`});found.push(...recs)}
+        }
+      }
+    }
+    if(!found.length){
+      showAlert('warning','לא נמצאו נתונים',`לא מצאנו קבצי YMGR בשלוחה ${folder}.`);
+      qs('city-grid').innerHTML='<div class="empty"><div class="ico">📭</div><p>אין נתונים</p></div>';
+      return;
+    }
+    const sample=found[0]||{};
+    const sampleKeys=Object.keys(sample);
+    console.log('שדות דגימה:',sampleKeys,'ערך ראשון:',JSON.stringify(sample));
+    // ApprovalAll.ymgr — כל רשומה כבר ייחודית (אחת לנרשם); רק ב-Log נייחד לפי טלפון
+    const isApproval=found[0]?._path?.toLowerCase().includes('approvalall');
+    if(isApproval){
+      _records=found; // כבר ייחודי
     } else {
-      dbg.classList.add('hidden');
+      const phoneKey=r=>r['_phone']||r['Folder']||r['Phone']||r['phone']||r['DID']||r['IncomingDID']||'';
+      const byPhone=new Map();
+      for(const r of found){const p=phoneKey(r);if(p)byPhone.set(p,r);else byPhone.set(Symbol(),r)}
+      _records=[...byPhone.values()];
     }
-
-    if (!d.files || d.files.length === 0) {
-      list.innerHTML = `<p class="text-xs text-amber-600 py-1">לא נמצאו קבצים — הזן שם קובץ ידנית בשדה למטה</p>`;
-    } else {
-      list.innerHTML = d.files.map(f => `
-        <button type="button" onclick="selectFile('${esc(f.fileName)}')"
-          class="w-full text-right bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 rounded-lg px-4 py-3 transition group">
-          <div class="flex items-center justify-between">
-            <span class="font-mono text-sm font-semibold text-blue-700">${esc(f.fileName)}</span>
-            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full group-hover:bg-blue-200">
-              ${f.rowCount} רשומות
-            </span>
-          </div>
-          ${f.headers && f.headers.length ? `
-            <p class="text-xs text-gray-400 mt-1 truncate">
-              עמודות: ${f.headers.slice(0,6).map(h=>esc(h)).join(' · ')}${f.headers.length>6?' …':''}
-            </p>` : ''}
-        </button>
-      `).join('');
-    }
-
-    box.classList.remove('hidden');
-  } catch(e) {
-    list.innerHTML = `<p class="text-sm text-red-500 py-2">❌ ${esc(e.message)}</p>`;
-    box.classList.remove('hidden');
-  }
-
-  btn.disabled = false;
-  icon.textContent = '🔍';
-  label.textContent = 'חפש קבצים';
+    buildColumns(_records);
+    renderDashboard();
+  }catch(e){console.error(e);if(e.message.includes('CORS')||e.message.includes('network')||e.message.includes('Failed to fetch')){qs('cors-tip').hidden=false}else{setStatus('err',e.message.slice(0,40))}qs('city-grid').innerHTML=`<div class="empty"><div class="ico">❌</div><p>${esc(e.message)}</p></div>`}
 }
 
-// ── Wizard state ───────────────────────────────────────────────────────
-let wizStep  = 1;
-let wizToken = '';
-let wizExt   = '';
-let wizFile  = '';
-
-// ── Wizard navigation ──────────────────────────────────────────────────
-function openSettings() {
-  wizToken = cfg.apiKey    || '';
-  wizExt   = cfg.extension || '';
-  wizFile  = cfg.fileName  || '';
-
-  document.getElementById('m-apikey').value = wizToken;
-  document.getElementById('m-ext').value    = wizExt;
-  document.getElementById('token-status').textContent = '';
-  document.getElementById('files-found').classList.add('hidden');
-
-  // If already fully configured, jump straight to confirm step
-  const startStep = (wizToken && wizExt && wizFile) ? 3 : 1;
-  if (startStep === 3) _populateConfirmStep();
-  goStep(startStep);
-
-  if (headers.length) { buildColInputs(); buildPivotRows(); }
-  document.getElementById('col-section').classList.toggle('hidden', !headers.length);
-  document.getElementById('pivot-cfg-section').classList.toggle('hidden', !headers.length);
-  const tog = document.getElementById('crud-lock-toggle');
-  if (tog) tog.checked = isLocked();
-  document.getElementById('modal').classList.remove('hidden');
-}
-
-function closeSettings() { document.getElementById('modal').classList.add('hidden'); }
-
-function goStep(n) {
-  wizStep = n;
-  [1, 2, 3].forEach(i => {
-    document.getElementById(`wiz-step-${i}`).classList.toggle('hidden', i !== n);
+function renderMiniPie(items,containerId){
+  const el=qs(containerId);if(!el)return;
+  const total=items.reduce((s,[,n])=>s+n,0);if(!total){el.innerHTML='';return}
+  const COLORS=['#2563EB','#7C3AED','#DB2777','#DC2626','#D97706','#059669','#0891B2','#4338CA','#BE185D','#92400E','#047857','#0E7490'];
+  const R=75,cx=90,cy=90,size=180;
+  let angle=-Math.PI/2,paths='',legendHtml='';
+  items.forEach(([name,count],i)=>{
+    const slice=count/total*Math.PI*2;
+    const x1=cx+R*Math.cos(angle),y1=cy+R*Math.sin(angle);
+    angle+=slice;
+    const x2=cx+R*Math.cos(angle),y2=cy+R*Math.sin(angle);
+    const large=slice>Math.PI?1:0;
+    const col=COLORS[i%COLORS.length];
+    paths+=`<path d="M${cx},${cy} L${x1},${y1} A${R},${R} 0 ${large},1 ${x2},${y2} Z" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`;
+    const pct=Math.round(count/total*100);
+    legendHtml+=`<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:5px">
+      <span style="width:11px;height:11px;border-radius:3px;background:${col};flex-shrink:0"></span>
+      <span style="font-weight:600">${esc(name)}</span>
+      <span style="color:var(--muted)">${count.toLocaleString('he')} (${pct}%)</span></div>`;
   });
-  _updateIndicators();
-  _renderFooter();
+  el.innerHTML=`<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="max-width:180px;flex-shrink:0">${paths}</svg><div>${legendHtml}</div>`;
+}
+function renderPieChart(cities){
+  if(!cities.length){qs('pie-section').hidden=true;return}
+  qs('pie-section').hidden=false;
+  renderMiniPie(cities,'pie-wrap');
 }
 
-function _updateIndicators() {
-  [1, 2, 3].forEach(i => {
-    const numEl = document.getElementById(`ind-${i}-num`);
-    const lblEl = document.getElementById(`ind-${i}-lbl`);
-    if (i < wizStep) {
-      numEl.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-green-500 text-white';
-      numEl.textContent = '✓';
-      lblEl.className = 'text-xs text-green-600 font-medium';
-    } else if (i === wizStep) {
-      numEl.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-blue-600 text-white';
-      numEl.textContent = String(i);
-      lblEl.className = 'text-xs font-medium text-blue-700';
-    } else {
-      numEl.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400';
-      numEl.textContent = String(i);
-      lblEl.className = 'text-xs text-gray-400';
-    }
-  });
+function getCityCounts(recs){
+  const m={};
+  for(const r of recs){const c=cityLabel(r[CITY_KEY]);m[c]=(m[c]||0)+1}
+  return Object.entries(m).sort((a,b)=>b[1]-a[1])
+}
+function getNbhdCounts(recs){
+  const m={};
+  for(const r of recs){const n=nbhdLabel(r[NBHD_KEY]);m[n]=(m[n]||0)+1}
+  return Object.entries(m).sort((a,b)=>b[1]-a[1])
 }
 
-function _renderFooter() {
-  const f = document.getElementById('modal-footer');
-  const backBtn = (label, step) =>
-    `<button onclick="goStep(${step})" class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">← ${label}</button>`;
-  const nextBtn = (label, fn, disabled = false) =>
-    `<button onclick="${fn}()" id="wiz-next" ${disabled ? 'disabled' : ''}
-      class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
-      ${label} →</button>`;
-
-  if (wizStep === 1) {
-    f.innerHTML = `<div class="flex justify-between items-center">
-      <button onclick="closeSettings()" class="text-sm text-gray-500 hover:text-gray-700">ביטול</button>
-      ${nextBtn('הבא', 'wizNext1', !wizToken)}
+function renderDashboard(){
+  const allCities=getCityCounts(_records);
+  const cities=allCities.filter(([c])=>c!=='(לא ידוע)');
+  const unknownCount=allCities.find(([c])=>c==='(לא ידוע)')?.[1]||0;
+  const knownTotal=cities.reduce((s,[,n])=>s+n,0);
+  const total=_records.length;
+  qs('dash-meta').textContent=`${total.toLocaleString('he')} רשומות · ${cities.length} ערים (${knownTotal.toLocaleString('he')} עם נתוני עיר)`;
+  const maxN=cities[0]?.[1]||1;
+  let html=`<div class="city-card city-card-total" onclick="drillAll()" style="cursor:pointer">
+    <div class="city-count">${total.toLocaleString('he')}</div>
+    <div class="city-name">כל הרשומות</div>
+    ${unknownCount?`<div class="city-pct">${unknownCount.toLocaleString('he')} ללא עיר</div>`:''}
+  </div>`;
+  cities.forEach(([city,count],i)=>{
+    const pct=Math.round(count/knownTotal*100),fw=Math.round(count/maxN*100);
+    html+=`<div class="city-card ${COL_CLS[i%12]}" data-city="${esc(city)}" onclick="drillCity(this.dataset.city)">
+      <div class="city-count">${count.toLocaleString('he')}</div>
+      <div class="city-name">${esc(city)}</div>
+      <div class="city-pct">${pct}%</div>
+      <div class="bar-bg"><div class="bar-fill" style="width:${fw}%"></div></div>
     </div>`;
-  } else if (wizStep === 2) {
-    f.innerHTML = `<div class="flex justify-between items-center">
-      ${backBtn('חזור', 1)}
-      ${nextBtn('הבא', 'wizNext2', !wizFile)}
-    </div>`;
-  } else {
-    f.innerHTML = `<div class="flex justify-between items-center">
-      ${backBtn('חזור', 2)}
-      <button onclick="doSaveLoad()"
-        class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2 rounded-lg transition">
-        שמור וטען נתונים
-      </button>
-    </div>`;
-  }
-}
-
-function wizNext1() {
-  wizToken = document.getElementById('m-apikey').value.trim();
-  if (!wizToken) return;
-  goStep(2);
-}
-
-function wizNext2() {
-  wizExt = document.getElementById('m-ext').value.trim();
-  if (!wizFile || !wizExt) return;
-  _populateConfirmStep();
-  goStep(3);
-}
-
-function _populateConfirmStep() {
-  const masked = wizToken.length > 12
-    ? wizToken.slice(0, 6) + '…' + wizToken.slice(-4)
-    : wizToken;
-  document.getElementById('confirm-token').textContent = masked;
-  document.getElementById('confirm-ext').textContent   = wizExt;
-  document.getElementById('confirm-file').textContent  = wizFile;
-  document.getElementById('confirm-path').textContent  = `ivr2:${wizExt}/${wizFile}`;
-}
-
-// ── Step 1: Token input + test ─────────────────────────────────────────
-function onTokenInput() {
-  const key = document.getElementById('m-apikey').value.trim();
-  const btn = document.getElementById('test-token-btn');
-  const status = document.getElementById('token-status');
-  if (btn) btn.disabled = !key;
-  if (!key) { wizToken = ''; status.textContent = ''; }
-}
-
-async function doTestToken() {
-  const key    = document.getElementById('m-apikey').value.trim();
-  const status = document.getElementById('token-status');
-  const btn    = document.getElementById('test-token-btn');
-  const nxt    = document.getElementById('wiz-next');
-  if (!key) return;
-
-  btn.disabled = true;
-  status.innerHTML = '<span class="text-gray-400">בודק חיבור לשרת...</span>';
-
-  try {
-    const r = await fetch('/api/test-token', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ token: key })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      wizToken = key;
-      status.innerHTML = '✅ <strong>החיבור הצליח!</strong> מפתח ה-API תקין';
-      status.className = 'mt-3 text-sm text-green-600';
-      if (nxt) nxt.disabled = false;
-    } else {
-      wizToken = '';
-      status.textContent = '❌ ' + (d.message || 'שגיאת חיבור');
-      status.className = 'mt-3 text-sm text-red-600';
-      if (nxt) nxt.disabled = true;
-    }
-  } catch(e) {
-    status.textContent = '❌ ' + e.message;
-    status.className = 'mt-3 text-sm text-red-600';
-  }
-  btn.disabled = false;
-}
-
-// ── Step 2: Select file ────────────────────────────────────────────────
-function selectManualFile() {
-  const val = (document.getElementById('manual-filename')?.value || '').trim();
-  if (!val) return;
-  selectFile(val);
-}
-
-function selectFile(fileName) {
-  wizFile = fileName;
-  document.querySelectorAll('#files-list button').forEach(b => {
-    const sel = b.getAttribute('onclick').includes(`'${fileName}'`);
-    b.classList.toggle('ring-2', sel);
-    b.classList.toggle('ring-blue-500', sel);
   });
-  // Enable "next" button
-  const nxt = document.getElementById('wiz-next');
-  if (nxt) nxt.disabled = false;
+  qs('city-grid').innerHTML=html;
+  renderPieChart(cities);
 }
 
-// ── Step 3: Save & load ────────────────────────────────────────────────
-function readSettings() {
-  const labels = {};
-  document.querySelectorAll('.col-lbl').forEach(inp => {
-    const c = inp.dataset.col, v = inp.value.trim();
-    if (v && v !== c) labels[c] = v;
-  });
-  return {
-    apiKey:       wizToken,
-    extension:    wizExt,
-    fileName:     wizFile,
-    columnLabels: labels,
-    pivots:       readPivots(),
-    crudLocked:   !!document.getElementById('crud-lock-toggle')?.checked,
-  };
-}
-
-async function doSaveLoad() {
-  cfg = readSettings();
-  saveCfg();
-  // Save to server so all users share these settings
-  try {
-    await fetch('/api/config', {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ apiKey: cfg.apiKey, extension: cfg.extension, fileName: cfg.fileName })
-    });
-  } catch {} // silent — local save already done
-  closeSettings();
-  await doLoad();
-}
-
-function buildColInputs() {
-  const labels = cfg.columnLabels || {};
-  document.getElementById('col-inputs').innerHTML = headers.map(h =>
-    `<div class="flex items-center gap-2">
-      <span class="text-xs text-gray-400 w-36 truncate font-mono" title="${esc(h)}">${esc(h)}</span>
-      <span class="text-gray-300">→</span>
-      <input type="text" class="col-lbl flex-1 border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
-        data-col="${esc(h)}" value="${esc(labels[h]||'')}" placeholder="${esc(h)}">
-    </div>`
-  ).join('');
-}
-
-// ── Lock / unlock editing ──────────────────────────────────────────────
-function isLocked() { return cfg.crudLocked !== false; }
-
-function applyLockState() {
-  const locked = isLocked();
-  const btn    = document.getElementById('lock-btn');
-  const icon   = document.getElementById('lock-icon');
-  const lbl    = document.getElementById('lock-label');
-  if (btn) {
-    icon.textContent = locked ? '🔒' : '🔓';
-    lbl.textContent  = locked ? 'נעול' : 'פתוח לעריכה';
-    btn.className = `touch-btn text-sm px-3 py-2 rounded-lg gap-1 transition ${
-      locked ? 'bg-red-800 hover:bg-red-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'
-    }`;
-  }
-  // Show/hide add-row button
-  const addBtn = document.getElementById('add-row-btn');
-  if (addBtn) addBtn.classList.toggle('hidden', locked || !headers.length);
-  // Sync settings toggle if visible
-  const tog = document.getElementById('crud-lock-toggle');
-  if (tog) tog.checked = locked;
-  // Re-render table to update action buttons
-  if (allRows.length) renderTable();
-}
-
-function toggleCrudLock() {
-  cfg.crudLocked = !isLocked();
-  saveCfg();
-  applyLockState();
-  showAlert(isLocked() ? 'warning' : 'success',
-    isLocked() ? '🔒 עריכת נתונים ננעלה' : '🔓 עריכת נתונים פתוחה — היזהר בביצוע שינויים');
-}
-
-// ── CRUD helpers ──────────────────────────────────────────────────────
-const CRUD_READONLY = ['ApiCallId', 'ApiTime', 'ApiPhone', 'ApiExtension'];
-
-function closeCrudModal() { document.getElementById('crud-modal').classList.add('hidden'); }
-function closeDelModal()  { document.getElementById('del-modal').classList.add('hidden'); pendingDeleteRow = null; }
-
-// Build a form field for one column
-function _crudField(h, val, readOnly) {
-  const label = (cfg.columnLabels || {})[h] || h;
-  if (readOnly) return `
-    <div class="mb-3">
-      <label class="block text-xs font-semibold text-gray-400 mb-0.5">${esc(label)} <span class="font-normal">(קריאה בלבד)</span></label>
-      <div class="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-500 font-mono truncate">${esc(val||'—')}</div>
-    </div>`;
-  return `
-    <div class="mb-3">
-      <label class="block text-xs font-semibold text-gray-700 mb-0.5">${esc(label)}</label>
-      <input type="text" class="crud-field w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-        data-col="${esc(h)}" value="${esc(val||'')}" placeholder="${esc(h)}">
-    </div>`;
-}
-
-// Read all crud-field inputs → rowData object (commas stripped)
-function _readCrudFields() {
-  const rowData = {};
-  let hasComma = false;
-  document.querySelectorAll('#crud-body .crud-field').forEach(inp => {
-    const v = inp.value;
-    if (v.includes(',')) { hasComma = true; inp.value = v.replace(/,/g, ''); }
-    rowData[inp.dataset.col] = inp.value;
-  });
-  if (hasComma) showAlert('warning', 'פסיקים הוסרו מהערכים — הם עלולים לשבור את מבנה הקובץ');
-  return rowData;
-}
-
-// POST to /api/crud
-async function _callCrud(payload) {
-  const r = await fetch('/api/crud', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ token: cfg.apiKey, extension: cfg.extension, fileName: cfg.fileName, ...payload }),
-  });
-  return r.json();
-}
-
-// ── Warning banner shown at top of every CRUD form ────────────────────
-const CRUD_WARNING = `<div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
-  <span class="text-amber-500 text-lg flex-shrink-0">⚠️</span>
-  <div>
-    <p class="text-sm font-semibold text-amber-800">שים לב — שינוי בקובץ המקור!</p>
-    <p class="text-xs text-amber-700 mt-0.5">פעולה זו משנה את הקובץ המקורי בשרת ימות המשיח ועלולה לשבש נתונים שנאספו מהמרכזייה. ודא שאתה יודע מה אתה עושה.</p>
-  </div>
-</div>`;
-
-// ── Open Edit modal ────────────────────────────────────────────────────
-function openEditRow(apiCallId) {
-  if (isLocked()) { showAlert('warning', '🔒 עריכת נתונים נעולה — לחץ על כפתור הנעילה בראש העמוד כדי לפתוח'); return; }
-  const row = allRows.find(r => r['ApiCallId'] === apiCallId);
-  if (!row) { showAlert('error', 'שורה לא נמצאה'); return; }
-
-  document.getElementById('crud-title').textContent = '✏️ עריכת שורה';
-  document.getElementById('crud-body').innerHTML = CRUD_WARNING +
-    headers.map(h => _crudField(h, row[h], CRUD_READONLY.includes(h))).join('');
-  document.getElementById('crud-submit-area').innerHTML =
-    `<button onclick="submitEdit('${esc(apiCallId)}')"
-      class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
-      שמור שינויים
-    </button>`;
-  document.getElementById('crud-modal').classList.remove('hidden');
-}
-
-async function submitEdit(apiCallId) {
-  const rowData = _readCrudFields();
-  const btn = document.querySelector('#crud-submit-area button');
-  btn.disabled = true; btn.textContent = 'שומר...';
-  try {
-    const d = await _callCrud({ action: 'edit', apiCallId, rowData, clientHash: crudContentHash });
-    if (d.conflict) { closeCrudModal(); showAlert('warning', d.message); return; }
-    if (!d.ok) throw new Error(d.message || 'שגיאה בשמירה');
-    if (d.newHash) crudContentHash = d.newHash;
-    // Update row in local state
-    const idx = allRows.findIndex(r => r['ApiCallId'] === apiCallId);
-    if (idx !== -1) allRows[idx] = { ...allRows[idx], ...rowData };
-    closeCrudModal();
-    render(); calcPivots(); calcStats();
-    showAlert('success', 'השורה עודכנה בהצלחה ✅');
-  } catch(e) {
-    showAlert('error', e.message);
-    btn.disabled = false; btn.textContent = 'שמור שינויים';
-  }
-}
-
-// ── Open Add modal ─────────────────────────────────────────────────────
-function openAddRow() {
-  if (isLocked()) { showAlert('warning', '🔒 עריכת נתונים נעולה — לחץ על כפתור הנעילה בראש העמוד כדי לפתוח'); return; }
-  if (!headers.length) { showAlert('warning', 'טען נתונים תחילה'); return; }
-  document.getElementById('crud-title').textContent = '➕ הוספת שורה חדשה';
-  document.getElementById('crud-body').innerHTML = CRUD_WARNING +
-    headers.filter(h => !CRUD_READONLY.includes(h))
-           .map(h => _crudField(h, '', false)).join('');
-  document.getElementById('crud-submit-area').innerHTML =
-    `<button onclick="submitAdd()"
-      class="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition">
-      ➕ הוסף שורה
-    </button>`;
-  document.getElementById('crud-modal').classList.remove('hidden');
-}
-
-async function submitAdd() {
-  const rowData = _readCrudFields();
-  const btn = document.querySelector('#crud-submit-area button');
-  btn.disabled = true; btn.textContent = 'מוסיף...';
-  try {
-    const d = await _callCrud({ action: 'add', rowData });
-    if (!d.ok) throw new Error(d.message || 'שגיאה בהוספה');
-    if (d.newHash) crudContentHash = d.newHash;
-    closeCrudModal();
-    await doLoad(); // reload to fetch the new row from server
-  } catch(e) {
-    showAlert('error', e.message);
-    btn.disabled = false; btn.textContent = '➕ הוסף שורה';
-  }
-}
-
-// ── Open Delete confirmation ───────────────────────────────────────────
-function openDeleteRow(apiCallId) {
-  if (isLocked()) { showAlert('warning', '🔒 עריכת נתונים נעולה — לחץ על כפתור הנעילה בראש העמוד כדי לפתוח'); return; }
-  const row = allRows.find(r => r['ApiCallId'] === apiCallId);
-  if (!row) { showAlert('error', 'שורה לא נמצאה'); return; }
-  pendingDeleteRow = row;
-  const preview = headers.slice(0, 6)
-    .map(h => `<span class="font-semibold text-gray-600">${esc((cfg.columnLabels||{})[h]||h)}:</span> ${esc(row[h]||'—')}`)
-    .join('<br>');
-  document.getElementById('del-preview').innerHTML = preview;
-  const btn = document.getElementById('del-confirm-btn');
-  btn.disabled = false; btn.textContent = 'מחק';
-  document.getElementById('del-modal').classList.remove('hidden');
-}
-
-async function confirmDelete() {
-  if (!pendingDeleteRow) return;
-  const apiCallId = pendingDeleteRow['ApiCallId'];
-  const btn = document.getElementById('del-confirm-btn');
-  btn.disabled = true; btn.textContent = 'מוחק...';
-  try {
-    const d = await _callCrud({ action: 'delete', apiCallId, clientHash: crudContentHash });
-    if (d.conflict) { closeDelModal(); showAlert('warning', d.message); return; }
-    if (!d.ok) throw new Error(d.message || 'שגיאה במחיקה');
-    if (d.newHash) crudContentHash = d.newHash;
-    allRows = allRows.filter(r => r['ApiCallId'] !== apiCallId);
-    closeDelModal();
-    calcStats(); render(); calcPivots();
-    showAlert('success', 'השורה נמחקה בהצלחה ✅');
-  } catch(e) {
-    showAlert('error', e.message);
-    btn.disabled = false; btn.textContent = 'מחק';
-  }
-}
-
-// ── Pivot calculation & render ─────────────────────────────────────────
-const PIVOT_COLORS = ['#3b82f6','#22c55e','#a855f7','#f97316','#f43f5e','#14b8a6','#eab308','#6366f1'];
-
-function calcPivots() {
-  const pivots = (cfg.pivots || []).filter(p => p.col && headers.includes(p.col));
-  const sec    = document.getElementById('pivot-section');
-  const cards  = document.getElementById('pivot-cards');
-  if (!pivots.length || !allRows.length) { sec.classList.add('hidden'); return; }
-
-  cards.innerHTML = pivots.map((p, idx) => {
-    const color = PIVOT_COLORS[idx % PIVOT_COLORS.length];
-    const counts = {};
-    allRows.forEach(r => {
-      const v = String(r[p.col] ?? '').trim() || '(ריק)';
-      counts[v] = (counts[v] || 0) + 1;
-    });
-    const total  = allRows.length;
-    const items  = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    const top    = items.slice(0, 8);
-    const rest   = items.length > 8 ? items.slice(8).reduce((s, e) => s + e[1], 0) : 0;
-    const label  = p.label || p.col;
-
-    const bars = top.map(([val, cnt]) => {
-      const pct = Math.round(cnt / total * 100);
-      return `<div>
-        <div class="flex justify-between items-center text-xs mb-0.5 gap-1">
-          <span class="text-gray-600 truncate" title="${esc(val)}">${esc(val)}</span>
-          <span class="font-semibold text-gray-700 flex-shrink-0">${cnt.toLocaleString()} <span class="text-gray-400 font-normal">(${pct}%)</span></span>
-        </div>
-        <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div class="h-1.5 rounded-full" style="width:${pct}%;background-color:${color}"></div>
-        </div>
+function drillCity(raw){
+  const city=raw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
+  _activeCity=city;_activeNbhd=null;_activeRamot=null;_drillPage=1;_drillSort=null;_drillSortAsc=true;
+  qs('ramot-section').hidden=true;
+  qs('search-in').value='';
+  const cityRecs=_records.filter(r=>cityLabel(r[CITY_KEY])===city);
+  qs('drill-title').textContent=city;
+  qs('drill-count').textContent=`${cityRecs.length.toLocaleString('he')} רשומות`;
+  const allNbhds=getNbhdCounts(cityRecs);
+  console.log('שכונות ל'+city+':', JSON.stringify(allNbhds));
+  console.log('דוגמת P051:', cityRecs.slice(0,5).map(r=>r['P051']));
+  const nbhds=allNbhds.filter(([n])=>n!=='(לא ידוע)');
+  if(nbhds.length>0){
+    qs('nbhd-meta').textContent=`${nbhds.length} שכונות · ${cityRecs.length.toLocaleString('he')} רשומות`;
+    const nbhdTotal=nbhds.reduce((s,[,n])=>s+n,0);
+    const maxN=nbhds[0]?.[1]||1;
+    // כרטיסי שכונות (כמו כרטיסי ערים)
+    let html=`<div class="city-card city-card-total" style="cursor:pointer" data-nbhd="" onclick="filterNbhd(null)">
+      <div class="city-count">${cityRecs.length.toLocaleString('he')}</div>
+      <div class="city-name">הכל</div></div>`;
+    nbhds.forEach(([n,c],i)=>{
+      const pct=Math.round(c/nbhdTotal*100),fw=Math.round(c/maxN*100);
+      html+=`<div class="city-card ${COL_CLS[i%12]}" data-nbhd="${esc(n)}" onclick="filterNbhd(this.dataset.nbhd)">
+        <div class="city-count">${c.toLocaleString('he')}</div>
+        <div class="city-name">${esc(n)}</div>
+        <div class="city-pct">${pct}%</div>
+        <div class="bar-bg"><div class="bar-fill" style="width:${fw}%"></div></div>
       </div>`;
-    }).join('');
-
-    const restHtml = rest
-      ? `<p class="text-xs text-gray-400 mt-2">ועוד ${(items.length - 8)} ערכים נוספים (${rest.toLocaleString()} רשומות)</p>`
-      : '';
-
-    return `<div class="bg-white rounded-xl shadow-sm p-4">
-      <div class="flex items-center justify-between mb-3 gap-2">
-        <h3 class="font-semibold text-gray-700 text-sm truncate">${esc(label)}</h3>
-        <span class="text-xs text-gray-400 flex-shrink-0">${items.length} ערכים</span>
-      </div>
-      <div class="space-y-2">${bars}</div>
-      ${restHtml}
-    </div>`;
-  }).join('');
-
-  sec.classList.remove('hidden');
+    });
+    qs('nbhd-grid').innerHTML=html;
+    // עוגת שכונות
+    renderMiniPie(nbhds,'nbhd-pie-wrap');
+    qs('nbhd-section').hidden=false;
+  }else{qs('nbhd-section').hidden=true}
+  qs('view-dashboard').hidden=true;qs('view-city').hidden=false;
+  applyDrillFilter();
 }
-
-// ── Pivot settings (in modal step 3) ───────────────────────────────────
-function buildPivotRows() {
-  const container = document.getElementById('pivot-rows');
-  container.innerHTML = '';
-  const pivots = cfg.pivots || [];
-  if (pivots.length) {
-    pivots.forEach(p => _appendPivotRow(p.col, p.label || ''));
-  }
-}
-
-function addPivotRow() { _appendPivotRow('', ''); }
-
-function _appendPivotRow(col, label) {
-  const container = document.getElementById('pivot-rows');
-  const div = document.createElement('div');
-  div.className = 'flex items-center gap-2';
-  const opts = headers.map(h =>
-    `<option value="${esc(h)}"${h === col ? ' selected' : ''}>${esc(h)}</option>`
-  ).join('');
-  div.innerHTML = `
-    <select class="pivot-col flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300">
-      <option value="">בחר עמודה...</option>${opts}
-    </select>
-    <input type="text" class="pivot-lbl w-28 border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
-      placeholder="כותרת" value="${esc(label)}">
-    <button type="button" onclick="this.closest('div').remove()"
-      class="text-red-400 hover:text-red-600 text-xl leading-none flex-shrink-0 px-1">✕</button>`;
-  container.appendChild(div);
-}
-
-function readPivots() {
-  const pivots = [];
-  document.querySelectorAll('#pivot-rows > div').forEach(row => {
-    const col   = row.querySelector('.pivot-col')?.value  || '';
-    const label = row.querySelector('.pivot-lbl')?.value?.trim() || '';
-    if (col) pivots.push({ col, label });
+function filterNbhd(nbhd){
+  _activeNbhd=nbhd||null;_activeRamot=null;_drillPage=1;
+  qs('nbhd-grid').querySelectorAll('.city-card').forEach(el=>{
+    const isAll=el.dataset.nbhd==='';
+    const match=nbhd?el.dataset.nbhd===nbhd:isAll;
+    el.style.outline=match?'3px solid rgba(255,255,255,.7)':'';
+    el.style.opacity=match?'1':'0.7';
   });
-  return pivots;
+  // פילוח בתוך רמות אם בחרו רמות
+  if(nbhd==='רמות'){
+    const cityBase=_activeCity==='__all__'?_records:_records.filter(r=>cityLabel(r[CITY_KEY])===_activeCity);
+    const ramotRecs=cityBase.filter(r=>nbhdLabel(r[NBHD_KEY])===nbhd);
+    const ramotCounts=getRamotCounts(ramotRecs);
+    const knownRamot=ramotCounts.filter(([n])=>n!=='(לא ידוע)');
+    if(knownRamot.length){
+      const ramotTotal=knownRamot.reduce((s,[,n])=>s+n,0);
+      const unknownRamot=ramotRecs.length-ramotTotal;
+      qs('ramot-meta').textContent=`${knownRamot.length} חלקים · ${ramotRecs.length.toLocaleString('he')} רשומות`;
+      const maxN=knownRamot[0]?.[1]||1;
+      let html=`<div class="city-card city-card-total" style="cursor:pointer" data-ramot="" onclick="filterRamot(null)">
+        <div class="city-count">${ramotRecs.length.toLocaleString('he')}</div>
+        <div class="city-name">כל רמות</div>
+        ${unknownRamot?`<div class="city-pct">${unknownRamot} ללא פרוט</div>`:''}
+        </div>`;
+      knownRamot.forEach(([n,c],i)=>{
+        const pct=Math.round(c/ramotTotal*100),fw=Math.round(c/maxN*100);
+        html+=`<div class="city-card ${COL_CLS[(i+5)%12]}" data-ramot="${esc(n)}" onclick="filterRamot(this.dataset.ramot)">
+          <div class="city-count">${c.toLocaleString('he')}</div>
+          <div class="city-name">${esc(n)}</div>
+          <div class="city-pct">${pct}%</div>
+          <div class="bar-bg"><div class="bar-fill" style="width:${fw}%"></div></div>
+        </div>`;
+      });
+      qs('ramot-grid').innerHTML=html;
+      renderMiniPie(knownRamot,'ramot-pie-wrap');
+      qs('ramot-section').hidden=false;
+    }else{qs('ramot-section').hidden=true}
+  }else{qs('ramot-section').hidden=true}
+  applyDrillFilter();
 }
-
-// ── UI helpers ─────────────────────────────────────────────────────────
-function setState(s) {
-  document.getElementById('state-loading').classList.toggle('hidden', s!=='loading');
-  document.getElementById('state-empty').classList.toggle('hidden',   s!=='empty');
-  document.getElementById('state-table').classList.toggle('hidden',   s!=='table');
-  if (s!=='table') document.getElementById('pagination').classList.add('hidden');
+let _activeRamot=null;
+function getRamotCounts(recs){
+  const m={};
+  for(const r of recs){const n=ramotLabel(r['P052'])||'(לא ידוע)';m[n]=(m[n]||0)+1}
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
 }
-
-let alertTimer;
-function showAlert(type, msg) {
-  const el=document.getElementById('alert');
-  const bg={success:'bg-green-50 border-green-200 text-green-800',error:'bg-red-50 border-red-200 text-red-800',warning:'bg-amber-50 border-amber-200 text-amber-800'};
-  el.className=`flex items-center gap-3 px-4 py-3 rounded-xl border fade-in ${bg[type]}`;
-  el.innerHTML=`<span class="text-lg">${{success:'✅',error:'❌',warning:'⚠️'}[type]}</span><span class="flex-1 text-sm">${esc(msg)}</span><button onclick="this.parentElement.classList.add('hidden')" class="opacity-50 hover:opacity-100">✕</button>`;
-  el.classList.remove('hidden');
-  clearTimeout(alertTimer);
-  if (type==='success') alertTimer=setTimeout(()=>el.classList.add('hidden'),4000);
+function filterRamot(ramot){
+  _activeRamot=ramot||null;
+  _activeNbhd='רמות'; // תמיד בתוך שכונת רמות
+  _drillPage=1;
+  qs('ramot-grid').querySelectorAll('.city-card').forEach(el=>{
+    const isAll=el.dataset.ramot==='';
+    const match=ramot?el.dataset.ramot===ramot:isAll;
+    el.style.outline=match?'3px solid rgba(255,255,255,.7)':'';
+    el.style.opacity=match?'1':'0.7';
+  });
+  applyDrillFilter();
 }
-function clearAlert() { document.getElementById('alert').classList.add('hidden'); }
-function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function applyDrillFilter(){
+  let base=_activeCity==='__all__'?_records:_records.filter(r=>cityLabel(r[CITY_KEY])===_activeCity);
+  if(_activeNbhd)base=base.filter(r=>nbhdLabel(r[NBHD_KEY])===_activeNbhd);
+  if(_activeRamot)base=base.filter(r=>ramotLabel(r['P052'])===_activeRamot);
+  const q=(qs('search-in').value||'').toLowerCase();
+  _drillFiltered=q?base.filter(r=>_columns.some(c=>String(cellVal(r,c)).toLowerCase().includes(q))):base;
+  renderDrillTable();
+}
+function renderDrillTable(){
+  let rows=[..._drillFiltered];
+  if(_drillSort)rows.sort((a,b)=>{
+    const av=cellVal(a,_drillSort),bv=cellVal(b,_drillSort);
+    const c=av<bv?-1:av>bv?1:0;return _drillSortAsc?c:-c
+  });
+  const total=rows.length,pages=Math.max(1,Math.ceil(total/PAGE_SIZE));
+  _drillPage=Math.max(1,Math.min(_drillPage,pages));
+  const start=(_drillPage-1)*PAGE_SIZE,pageRows=rows.slice(start,start+PAGE_SIZE);
+  qs('drill-thead').innerHTML='<tr><th class="idx" style="width:36px">#</th>'+
+    _columns.map(c=>{const s=_drillSort===c;return`<th class="${s?'sorted':''}" onclick="sortDrill('${c.replace(/'/g,"\\'")}')">
+      ${esc(colLabel(c))}<span class="sort-ico">${s?(_drillSortAsc?'▲':'▼'):'⇅'}</span></th>`}).join('')+'</tr>';
+  qs('drill-tbody').innerHTML=pageRows.length
+    ?pageRows.map((r,i)=>`<tr><td class="idx" data-label="#">${start+i+1}</td>${_columns.map(c=>{
+        const v=cellVal(r,c);
+        const cls=(c.toLowerCase().includes('phone')||c==='Folder')?'phone':'';
+        return`<td class="${cls}" data-label="${esc(colLabel(c))}">${esc(v)}</td>`
+      }).join('')}</tr>`).join('')
+    :`<tr><td colspan="${_columns.length+1}" style="text-align:center;padding:30px;color:var(--muted)">אין תוצאות</td></tr>`;
+  qs('list-info').textContent=`${total.toLocaleString('he')} רשומות`;
+  qs('page-info').textContent=`עמוד ${_drillPage} / ${pages}`;
+  const b=[`<button onclick="goPage(${_drillPage-1})" ${_drillPage<=1?'disabled':''}>›</button>`];
+  const lo=Math.max(1,_drillPage-3),hi=Math.min(pages,_drillPage+3);
+  if(lo>1)b.push(`<button onclick="goPage(1)">1</button>`);
+  if(lo>2)b.push(`<button disabled>…</button>`);
+  for(let i=lo;i<=hi;i++)b.push(`<button class="${i===_drillPage?'active':''}" onclick="goPage(${i})">${i}</button>`);
+  if(hi<pages-1)b.push(`<button disabled>…</button>`);
+  if(hi<pages)b.push(`<button onclick="goPage(${pages})">${pages}</button>`);
+  b.push(`<button onclick="goPage(${_drillPage+1})" ${_drillPage>=pages?'disabled':''}>‹</button>`);
+  qs('page-btns').innerHTML=b.join('');
+}
+function goPage(p){_drillPage=p;renderDrillTable()}
+function sortDrill(col){if(_drillSort===col)_drillSortAsc=!_drillSortAsc;else{_drillSort=col;_drillSortAsc=true}renderDrillTable()}
+function drillAll(){
+  _activeCity='__all__';_activeNbhd=null;_activeRamot=null;_drillPage=1;_drillSort=null;_drillSortAsc=true;
+  qs('search-in').value='';
+  qs('drill-title').textContent='כל הרשומות';
+  qs('drill-count').textContent=`${_records.length.toLocaleString('he')} רשומות`;
+  qs('nbhd-section').hidden=true;
+  qs('ramot-section').hidden=true;
+  qs('view-dashboard').hidden=true;qs('view-city').hidden=false;
+  _drillFiltered=_records;renderDrillTable();
+}
+function backToDash(){_activeCity=null;_activeNbhd=null;qs('view-city').hidden=true;qs('view-dashboard').hidden=false}
 
-// ── Init ───────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', async () => {
-  // Apply lock state immediately (before data loads) — default: locked
-  if (cfg.crudLocked === undefined) cfg.crudLocked = true;
-  applyLockState();
+function exportCSV(){
+  const e2=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const hdrs=_columns.map(c=>colLabel(c));
+  const csv=[hdrs.map(c=>e2(c)).join(','),..._drillFiltered.map(r=>_columns.map(c=>e2(cellVal(r,c))).join(','))].join('\n');
+  try{navigator.clipboard.writeText(csv).then(()=>showAlert('success','CSV הועתק ללוח',`${_drillFiltered.length} שורות — הדבק ב-Excel`),()=>fbCopy(csv))}catch{fbCopy(csv)}
+}
+function fbCopy(csv){const ta=document.createElement('textarea');ta.value=csv;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');showAlert('success','CSV הועתק ללוח','')}catch{showAlert('info','לא הצליח','')}document.body.removeChild(ta)}
 
-  // Load global config from server first (shared between all users)
-  try {
-    const r = await fetch('/api/config');
-    const d = await r.json();
-    if (d.ok && d.config && d.config.apiKey) {
-      // Server config takes precedence for connection settings
-      cfg = {
-        ...cfg,
-        apiKey:    d.config.apiKey    || cfg.apiKey,
-        extension: d.config.extension || cfg.extension,
-        fileName:  d.config.fileName  || cfg.fileName,
-      };
-      saveCfg(); // update local cache
-    }
-  } catch {} // if server unreachable, fall back to local localStorage
+function updateRing(){
+  const r=qs('ring-fg');
+  if(r)r.style.strokeDashoffset=_paused?75.4:75.4*(1-_cdCount/CONFIG.refreshSec);
+  const n=qs('cd-num');if(n)n.textContent=_paused?'—':_cdCount;
+}
+function togglePause(){
+  _paused=!_paused;
+  const btn=qs('btn-pause');
+  const lbl=qs('refresh-label');
+  if(_paused){
+    btn.textContent='▶ המשך';
+    if(lbl)lbl.innerHTML='<b>מושהה</b>';
+  } else {
+    btn.textContent='⏸ השהה';
+    if(lbl)lbl.innerHTML=`ריענון עוד <b id="cd-num">${_cdCount}</b> שנ'`;
+    _cdCount=CONFIG.refreshSec;
+  }
+  updateRing();
+}
+function startTimer(){
+  _cdCount=CONFIG.refreshSec;updateRing();clearInterval(_timerInterval);
+  _timerInterval=setInterval(async()=>{
+    if(_paused)return;
+    _cdCount--;if(_cdCount<=0){_cdCount=CONFIG.refreshSec;const prevCity=_activeCity;await loadData();if(prevCity)drillCity(prevCity)}
+    updateRing();
+  },1000);
+}
+async function manualRefresh(){_cdCount=CONFIG.refreshSec;updateRing();const prevCity=_activeCity;await loadData();if(prevCity)drillCity(prevCity)}
 
-  if (cfg.apiKey && cfg.extension && cfg.fileName) doLoad();
-});
+(async function(){
+  if(!credsOK()){qs('cfg-warn').hidden=false;return}
+  await loadData();startTimer();
+})();
 </script>
 </body>
 </html>
