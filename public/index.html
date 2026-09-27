@@ -240,8 +240,9 @@ const PAGE_SIZE=50;
 const COL_CLS=['cc0','cc1','cc2','cc3','cc4','cc5','cc6','cc7','cc8','cc9','cc10','cc11'];
 // ═══ הקלטות: נשמרות בתת-שלוחה "Record", בשם קובץ כמו:
 // OK-שמחת בית השואבה תשפז-1120-Phone-0548507931-Date-2026-09-27-01-08-19-Data-P050-1-P051-4.wav
+// הרשימה נשלפת רק בלחיצה על "השמע" (לא בכל רענון), ונשמרת בזיכרון לשימוש חוזר.
 // ═══
-let _recordingMap=new Map();
+let _recordingMap=null;
 function parseRecordingFilename(name){
   const info={};
   const phoneM=name.match(/-Phone-(\d+)-/);
@@ -256,7 +257,8 @@ function parseRecordingFilename(name){
   return info;
 }
 function recordingKey(phone,p050,p051){return `${phone}|${p050}|${p051}`}
-async function loadRecordings(){
+async function ensureRecordingMap(force){
+  if(_recordingMap&&!force)return _recordingMap;
   const map=new Map();
   const{files}=await getDir(`${CONFIG.folder}/Record`);
   for(const f of files){
@@ -267,12 +269,64 @@ async function loadRecordings(){
     }
   }
   _recordingMap=map;
+  return map;
 }
-// מוצא את קובץ ההקלטה התואם לרשומה, לפי טלפון+עיר+כמות (אותם ערכים ששמורים בשם הקובץ)
-function findRecordingRef(rec){
-  const phone=rec['Phone']||rec['phone']||rec['Folder']||'';
-  if(!phone)return null;
-  return _recordingMap.get(recordingKey(phone,rec[CITY_KEY],rec[QTY_KEY]))||null;
+
+// ═══ פענוח WAV טלפוני (G.711 A-law/µ-law) לצליל שדפדפנים יודעים לנגן ═══
+function alaw2linear(a){
+  a^=0x55;
+  let t=(a&0x0f)<<4;
+  const seg=(a&0x70)>>4;
+  if(seg===0)t+=8;else if(seg===1)t+=0x108;else{t+=0x108;t<<=(seg-1)}
+  return(a&0x80)?t:-t;
+}
+function ulaw2linear(u){
+  const BIAS=0x84;
+  u=(~u)&0xFF;
+  let t=((u&0x0f)<<3)+BIAS;
+  t<<=(u&0x70)>>4;
+  return(u&0x80)?(BIAS-t):(t-BIAS);
+}
+function parseWavHeader(buf){
+  const dv=new DataView(buf);
+  if(buf.byteLength<12||dv.getUint32(0,false)!==0x52494646||dv.getUint32(8,false)!==0x57415645)return null;
+  let offset=12,fmt=null,dataOffset=-1,dataLength=0;
+  while(offset+8<=buf.byteLength){
+    const id=dv.getUint32(offset,false),size=dv.getUint32(offset+4,true),body=offset+8;
+    if(id===0x666d7420)fmt={audioFormat:dv.getUint16(body,true),numChannels:dv.getUint16(body+2,true),sampleRate:dv.getUint32(body+4,true),bitsPerSample:dv.getUint16(body+14,true)};
+    else if(id===0x64617461){dataOffset=body;dataLength=size}
+    offset=body+size+(size%2);
+  }
+  if(!fmt||dataOffset<0)return null;
+  return{fmt,dataOffset,dataLength};
+}
+function writeStr(dv,offset,str){for(let i=0;i<str.length;i++)dv.setUint8(offset+i,str.charCodeAt(i))}
+function pcmToWavBlob(pcm,sampleRate,numChannels){
+  const blockAlign=numChannels*2,dataSize=pcm.length*2;
+  const buf=new ArrayBuffer(44+dataSize),dv=new DataView(buf);
+  writeStr(dv,0,'RIFF');dv.setUint32(4,36+dataSize,true);writeStr(dv,8,'WAVE');
+  writeStr(dv,12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);
+  dv.setUint16(22,numChannels,true);dv.setUint32(24,sampleRate,true);
+  dv.setUint32(28,sampleRate*blockAlign,true);dv.setUint16(32,blockAlign,true);dv.setUint16(34,16,true);
+  writeStr(dv,36,'data');dv.setUint32(40,dataSize,true);
+  let off=44;for(let i=0;i<pcm.length;i++,off+=2)dv.setInt16(off,pcm[i],true);
+  return new Blob([buf],{type:'audio/wav'});
+}
+// ממיר buffer של קובץ WAV טלפוני (A-law/µ-law/PCM 8-bit) ל-Blob URL שדפדפן יודע לנגן
+function wavToPlayableUrl(buf){
+  const parsed=parseWavHeader(buf);
+  if(!parsed)return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
+  const{fmt,dataOffset,dataLength}=parsed;
+  if(fmt.audioFormat===1&&fmt.bitsPerSample===16)return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
+  const src=new Uint8Array(buf,dataOffset,dataLength);
+  let decode;
+  if(fmt.audioFormat===6)decode=alaw2linear;
+  else if(fmt.audioFormat===7)decode=ulaw2linear;
+  else if(fmt.audioFormat===1&&fmt.bitsPerSample===8)decode=v=>(v-128)<<8;
+  else throw new Error('פורמט קובץ לא נתמך (audioFormat='+fmt.audioFormat+')');
+  const pcm=new Int16Array(src.length);
+  for(let i=0;i<src.length;i++)pcm[i]=decode(src[i]);
+  return URL.createObjectURL(pcmToWavBlob(pcm,fmt.sampleRate,fmt.numChannels||1));
 }
 
 function qs(id){return document.getElementById(id)}
@@ -330,18 +384,34 @@ async function downloadFile(path,timeoutMs=15000){
     return(t&&!t.includes('"responseStatus":"ERROR"'))?t:null;
   }catch{return null}
 }
-// משמיע קובץ הקלטה מתת-השלוחה Record (שם הקובץ תואם לרשומה לפי findRecordingRef)
-async function playRecording(path,btn){
+// משמיע קובץ הקלטה מתת-השלוחה Record — הרשימה נשלפת רק בלחיצה (ensureRecordingMap)
+async function playRecording(phone,p050,p051,btn){
   const orig=btn.textContent;
-  btn.disabled=true;btn.textContent='⏳';
+  btn.disabled=true;btn.textContent='⏳ מחפש…';
   try{
+    let map=await ensureRecordingMap();
+    let filename=map.get(recordingKey(phone,p050,p051));
+    if(!filename){
+      map=await ensureRecordingMap(true); // אולי ההקלטה נוספה זה עתה — נסה רשימה טרייה
+      filename=map.get(recordingKey(phone,p050,p051));
+    }
+    if(!filename){
+      btn.disabled=false;btn.textContent=orig;
+      alert('לא נמצאה הקלטה תואמת עבור הזמנה זו');
+      return;
+    }
+    btn.textContent='⏳ טוען…';
     const tok=await ensureToken();
-    const url=`${API}DownloadFile?token=${tok}&path=ivr2:${CONFIG.folder}/Record/${path}`;
-    const audio=new Audio(url);
-    audio.addEventListener('ended',()=>{btn.disabled=false;btn.textContent=orig});
-    audio.addEventListener('error',()=>{btn.disabled=false;btn.textContent=orig;alert('לא ניתן להשמיע את ההקלטה')});
+    const url=`${API}DownloadFile?token=${tok}&path=ivr2:${CONFIG.folder}/Record/${encodeURIComponent(filename)}`;
+    const res=await fetch(url);
+    if(!res.ok)throw new Error('שגיאת הורדה ('+res.status+')');
+    const buf=await res.arrayBuffer();
+    const blobUrl=wavToPlayableUrl(buf);
+    const audio=new Audio(blobUrl);
+    audio.addEventListener('ended',()=>{btn.disabled=false;btn.textContent=orig;URL.revokeObjectURL(blobUrl)});
+    audio.addEventListener('error',()=>{btn.disabled=false;btn.textContent=orig;URL.revokeObjectURL(blobUrl);alert('לא ניתן להשמיע את ההקלטה (פורמט לא נתמך בדפדפן)')});
     await audio.play();
-    btn.textContent='⏸ מתנגן…';
+    btn.disabled=false;btn.textContent='⏸ מתנגן…';
   }catch(e){
     btn.disabled=false;btn.textContent=orig;
     alert('שגיאה בהשמעת ההקלטה: '+e.message);
@@ -501,7 +571,6 @@ async function loadData(){
       _records=[...byPhone.values()];
     }
     buildColumns(_records);
-    await loadRecordings();
     renderDashboard();
   }catch(e){console.error(e);if(e.message.includes('CORS')||e.message.includes('network')||e.message.includes('Failed to fetch')){qs('cors-tip').hidden=false}else{setStatus('err',e.message.slice(0,40))}qs('city-grid').innerHTML=`<div class="empty"><div class="ico">❌</div><p>${esc(e.message)}</p></div>`}
 }
@@ -610,9 +679,10 @@ function renderDrillTable(){
           const cls=(c.toLowerCase().includes('phone')||c==='Folder')?'phone':'';
           return`<td class="${cls}" data-label="${esc(colLabel(c))}">${esc(v)}</td>`
         }).join('');
-        const recRef=findRecordingRef(r);
-        const recCell=recRef
-          ?`<td data-label="הקלטה"><button class="btn-refresh" style="color:var(--accent);background:var(--accent-dim);border-color:#93C5FD" onclick="playRecording('${recRef.replace(/'/g,"\\'")}',this)">🔊 השמע</button></td>`
+        const phoneRaw=String(r['Phone']||r['phone']||r['Folder']||'').trim();
+        const jsSafe=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const recCell=phoneRaw
+          ?`<td data-label="הקלטה"><button class="btn-refresh" style="color:var(--accent);background:var(--accent-dim);border-color:#93C5FD" onclick="playRecording('${jsSafe(phoneRaw)}','${jsSafe(r[CITY_KEY]??'')}','${jsSafe(r[QTY_KEY]??'')}',this)">🔊 השמע</button></td>`
           :`<td data-label="הקלטה">—</td>`;
         return`<tr><td class="idx" data-label="#">${start+i+1}</td>${cells}${recCell}</tr>`;
       }).join('')
